@@ -7,6 +7,7 @@ import offerRoutes from './routes/offers.js';
 import watchlistRoutes from './routes/watchlist.js';
 import alertRoutes from './routes/alerts.js';
 import notificationRoutes from './routes/notifications.js';
+import notificationPreferencesRoutes from './routes/notificationPreferences.js';
 import telegramRoutes from './routes/telegram.js';
 import monitorRoutes from './routes/monitor.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -35,7 +36,7 @@ app.use('/api/offers', offerRoutes);
 app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/notification-preferences', notificationRoutes);
+app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/monitor', monitorRoutes);
 

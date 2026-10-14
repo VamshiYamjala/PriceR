@@ -205,4 +205,54 @@ PriceRadar/
   - Vite client build: Passed cleanly (107 modules transformed, output `dist/`).
 - **Errors Encountered:**
   - ERR-001: UnicodeEncodeError in python script during PDF outline inspection (Fixed).
-- **Next Task:** Reconcile route discrepancies, implement database seeding script, and guide user through MongoDB Atlas setup.
+  - ERR-002: Remote repository host resolution failure (Fixed & Verified).
+- **Git Commit Hash:** `69f9ec8` (pushed to `origin/main`).
+- **Next Task:** Phase 2: Fix notification preferences routing, monitor controller HTTP status, fixture seeding job, and business logic tests.
+
+---
+
+### Task 2: Phase 2 Core API Corrections, Seeder, and Unit Test Suite
+- **Date & Time:** 2026-10-14 13:25 IST
+- **Phase:** Phase 2 — API Corrections, Seeder, and Pure Logic Unit Tests
+- **Files Created / Modified:**
+  - `server/src/routes/notificationPreferences.js` (Created)
+  - `server/src/routes/notifications.js` (Updated)
+  - `server/src/app.js` (Updated route mounts)
+  - `server/src/services/priceMonitor.js` (Updated state tracking & error counting)
+  - `server/src/controllers/monitorController.js` (Updated 202 status and added `getMonitorStatus`)
+  - `server/src/routes/monitor.js` (Updated with `/status` route)
+  - `server/src/jobs/seedFixtures.js` (Created idempotent database fixture seeder)
+  - `server/package.json` (Added `seed:fixtures` script)
+  - `server/src/services/alertEvaluator.js` (Added zero/negative price safety nets & re-arming logic)
+  - `server/tests/notificationPreferences.test.js` (Created route & validation tests)
+  - `server/tests/monitor.test.js` (Created monitoring trigger & status tests)
+  - `server/tests/money.test.js` (Created currency integer math tests)
+  - `server/tests/priceComparison.test.js` (Created lowest offer selection & savings tests)
+  - `server/tests/alertEvaluator.test.js` (Created alert evaluation, edge cases, and lifecycle tests)
+  - `ERROR_LOG.md` (Updated with ERR-002 verification and ERR-003 fix)
+- **What Changed:**
+  - **Task A (Routing):** Created a dedicated router for `/api/notification-preferences` matching Document 1 Section 6.5 contract (`GET /`, `PUT /`). Cleaned `/api/notifications` router to serve notification history. Added validation for email and 401 JWT auth guard.
+  - **Task B (Monitoring):** Implemented Document 1 Section 6.6 contract: `POST /api/monitor/run` checks `X-Monitor-Secret` (returns 401 `AUTH_INVALID` on mismatch) and responds with HTTP 202 Accepted. Implemented `GET /api/monitor/status` returning `{ lastRunAt, lastRunOffersChecked, lastRunErrors }` protected by user authentication.
+  - **Task C (Seeding):** Created `seedFixtures.js` that reads `fixtureData.json`, upserts products by `canonicalKey`, upserts offers by `(provider, externalProductId)`, guards against production without `--force-production`, and gracefully closes connections. Added `npm run seed:fixtures` script.
+  - **Task D (Testing & Logic):** Hardened `alertEvaluator.js` against invalid or $\le 0$ prices (prevents provider failures from triggering false price-drop alerts). Built 45 automated unit tests across 6 Jest test suites covering money, price comparison, alert evaluation lifecycle, and monitoring.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix "d:\priceR\server" test
+  npm --prefix "d:\priceR\client" run build
+  npm --prefix "d:\priceR\server" run seed:fixtures
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 6/6 passed, 45/45 tests green:
+    - `tests/health.test.js`: 2 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/priceComparison.test.js`: 9 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+  - Vite client build: 107 modules compiled with 0 errors.
+  - Seeder CLI test: Correctly exited with error and instructional message when `MONGODB_URI` was unconfigured.
+- **Errors Encountered:**
+  - ERR-003: `ReferenceError` in `tests/priceComparison.test.js` line 39 (Fixed & Verified).
+- **Git Commit Hash:** Pending Phase 2 commit.
+- **Next Task:** Phase 3/4: Database setup checkpoint (MongoDB Atlas cluster creation and connection).
+

@@ -13,23 +13,51 @@ import PriceObservation from '../models/PriceObservation.js';
 import Alert from '../models/Alert.js';
 import { evaluateAlert } from './alertEvaluator.js';
 
+// In-memory monitoring state for reporting via GET /api/monitor/status
+let monitorState = {
+  lastRunAt: null,
+  lastRunOffersChecked: 0,
+  lastRunErrors: 0,
+  isRunning: false,
+};
+
+/**
+ * Returns a snapshot of the price monitor status.
+ */
+export function getMonitorState() {
+  return { ...monitorState };
+}
+
+/**
+ * Test helper to reset or seed monitor state.
+ */
+export function setMonitorStateForTesting(state) {
+  monitorState = {
+    ...monitorState,
+    ...state,
+  };
+}
+
 /**
  * Runs a full or on-demand price monitoring cycle.
- * @returns {Promise<{offersChecked: number, triggeredAlerts: number}>}
+ * @returns {Promise<{offersChecked: number, triggeredAlerts: number, errors: number}>}
  */
 export async function runMonitoringCycle() {
   if (process.env.MONITORING_ENABLED === 'false') {
     console.log('[monitor] Monitoring is disabled via MONITORING_ENABLED=false');
-    return { offersChecked: 0, triggeredAlerts: 0 };
+    return { offersChecked: 0, triggeredAlerts: 0, errors: 0 };
   }
 
   console.log('[monitor] Starting price monitoring cycle...');
+  monitorState.isRunning = true;
+
   // Find distinct offers associated with active alerts or watchlists
   const activeAlerts = await Alert.find({ status: 'active' }).populate('offerId');
   const distinctOfferIds = [...new Set(activeAlerts.map((a) => a.offerId?._id?.toString()).filter(Boolean))];
 
   let offersChecked = 0;
   let triggeredAlerts = 0;
+  let errorsCount = 0;
 
   for (const offerId of distinctOfferIds) {
     try {
@@ -75,6 +103,7 @@ export async function runMonitoringCycle() {
         }
       } else {
         // Record failure safely — never 0 rupees
+        errorsCount++;
         offer.lastFetchedAt = new Date();
         offer.lastStatus = 'error';
         offer.lastError = fetchResult.errorMessage || 'Fetch failed';
@@ -88,12 +117,20 @@ export async function runMonitoringCycle() {
         });
       }
     } catch (err) {
+      errorsCount++;
       console.error(`[monitor] Error processing offer ${offerId}:`, err.message);
     }
   }
 
-  console.log(`[monitor] Cycle finished. Checked ${offersChecked} offers, triggered ${triggeredAlerts} alerts.`);
-  return { offersChecked, triggeredAlerts };
+  monitorState = {
+    lastRunAt: new Date().toISOString(),
+    lastRunOffersChecked: offersChecked,
+    lastRunErrors: errorsCount,
+    isRunning: false,
+  };
+
+  console.log(`[monitor] Cycle finished. Checked ${offersChecked} offers, triggered ${triggeredAlerts} alerts, encountered ${errorsCount} errors.`);
+  return { offersChecked, triggeredAlerts, errors: errorsCount };
 }
 
-export default { runMonitoringCycle };
+export default { runMonitoringCycle, getMonitorState, setMonitorStateForTesting };

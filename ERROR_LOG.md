@@ -60,21 +60,48 @@ Whenever an error occurs during development:
 ### ERR-002: Remote Repository Host Resolution Failure
 - **Date & Time:** 2026-10-14 13:01 IST
 - **Phase / Feature:** Phase 1 — Git & GitHub Remote Inspection
-- **Status:** INVESTIGATING
+- **Status:** VERIFIED
 - **Exact Error Message:**
   ```text
   fatal: unable to access 'https://github.com/VamshiYamjala/PriceR.git/': Could not resolve host: github.com
   ```
 - **Relevant Command / File:** `git ls-remote https://github.com/VamshiYamjala/PriceR.git`
 - **Root Cause:**
-  Local DNS resolution or network adapter in PowerShell temporarily failed or timed out when contacting `github.com`. Subsequent ping `Test-Connection -ComputerName github.com` succeeded, indicating the network interface is active but external HTTP queries may require Git Credential Manager or authenticated access.
+  Temporary transient local DNS resolution failure in the environment.
 - **Diagnostic Steps Performed:**
   1. Ran `git ls-remote` (failed with host resolution).
   2. Ran `Test-Connection -ComputerName github.com -Quiet` (returned `True`).
+  3. Formatted repository and attempted authenticated push via Git Credential Manager.
 - **Solution Attempted:**
-  Local repository initialization and branch setup completed first. Remote pushes will be authenticated using standard Git Credential Manager or verified credentials.
-- **Whether Solution Worked:** Local git initialization completed; network push will be verified once credentials/SSH are confirmed.
-- **Verification Evidence:** `git remote -v` successfully points to `https://github.com/VamshiYamjala/PriceR.git`.
+  Initial commit created, branch tracking configured, and pushed directly via `git push -u origin main`.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  `git push -u origin main` succeeded with `branch 'main' set up to track 'origin/main'` and remote SHA `69f9ec8`.
 - **Files Changed:** None.
-- **Prevention Steps:** Ensure Git for Windows has credential helper configured (`git config --global credential.helper manager`).
+- **Prevention Steps:** Use Git Credential Manager for HTTPS communication with GitHub.
+- **Related Errors:** None.
+
+---
+
+### ERR-003: TDZ ReferenceError in priceComparison.test.js
+- **Date & Time:** 2026-10-14 13:24 IST
+- **Phase / Feature:** Phase 2 Task D — Price Comparison Unit Testing
+- **Status:** VERIFIED
+- **Exact Error Message:**
+  ```text
+  ReferenceError: Cannot access 'lowest' before initialization
+  at Object.lowest (tests/priceComparison.test.js:39:38)
+  ```
+- **Relevant Command / File:** `npm test -- tests/priceComparison.test.js`
+- **Root Cause:**
+  In `server/tests/priceComparison.test.js`, line 39 accidentally referenced `lowest` inside its own initializer (`const lowest = findLowestOffer(lowest ? offers : offers)`), hitting the JavaScript Temporal Dead Zone (TDZ).
+- **Diagnostic Steps Performed:**
+  Inspected test failure stack trace at line 39.
+- **Solution Attempted:**
+  Corrected line 39 to pass `offers` directly: `const lowest = findLowestOffer(offers)`.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  Re-ran full Jest test suite. 6/6 test suites passed with all 45 unit tests green.
+- **Files Changed:** `server/tests/priceComparison.test.js`.
+- **Prevention Steps:** Carefully review test argument expressions before execution.
 - **Related Errors:** None.

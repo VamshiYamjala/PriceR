@@ -1,25 +1,17 @@
 // server/src/routes/notifications.js
+// Owner: Member 3
+// Notification history endpoints (Document 1 Section 6.5)
+
 import { Router } from 'express';
-import { body } from 'express-validator';
 import { requireAuth } from '../middleware/auth.js';
-import { validate } from '../middleware/validate.js';
-import {
-  listNotifications,
-  getNotificationPreferences,
-  updateNotificationPreferences,
-} from '../controllers/notificationsController.js';
+import { listNotifications } from '../controllers/notificationsController.js';
 
 const router = Router();
 
+// All notification endpoints require an authenticated user
 router.use(requireAuth);
 
+// GET /api/notifications — retrieves notification delivery events for the logged-in user
 router.get('/', listNotifications);
-router.get('/preferences', getNotificationPreferences);
-router.put(
-  '/preferences',
-  [body('email').optional().isEmail().withMessage('Please provide a valid email address.')],
-  validate,
-  updateNotificationPreferences
-);
 
 export default router;
