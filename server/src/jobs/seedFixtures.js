@@ -70,6 +70,8 @@ export async function seedFixtures(options = {}) {
           variant: item.variant,
           canonicalKey: item.canonicalKey.toLowerCase().trim(),
           imageUrl: item.imageUrl,
+          sourceProvider: 'fixture',
+          dataStatus: 'sample',
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
@@ -93,6 +95,7 @@ export async function seedFixtures(options = {}) {
               currency: offerItem.currency || 'INR',
               availability: offerItem.availability || 'in_stock',
               isSample: true, // Master Guide rule: all fixture data is explicitly isSample: true
+              dataStatus: 'sample',
               lastFetchedAt: new Date(),
               lastSuccessAt: offerItem.forceFail ? null : new Date(),
               lastStatus: offerItem.forceFail ? 'error' : 'ok',

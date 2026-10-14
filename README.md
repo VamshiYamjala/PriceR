@@ -87,7 +87,35 @@ PriceRadar allows users to search for e-commerce products, compare prices across
 
 ---
 
-## 4. Repository Structure
+## 4. Multi-Provider Product Data Architecture
+
+PriceRadar features a modular multi-provider architecture designed to provide rich product discovery under a **₹0 API budget** today while ensuring seamless integration with genuine retailer APIs in the future.
+
+### Provider Integration Matrix
+
+| Provider | Type | Status | API Budget | Purpose |
+|---|---|---|---|---|
+| **DummyJSON** | REST Catalog | **Active** | ₹0 (Free) | Primary free sample catalog for product discovery, categories, and exploratory search with automated USD $\to$ INR conversion. |
+| **Fixture Dataset** | Static JSON | **Active** | ₹0 (Local) | Deterministic test fixtures for automated testing, multi-retailer price comparison, and predictable price-drop simulation. |
+| **mock.shop** | GraphQL | **Active (Optional)** | ₹0 (Free) | Shopify headless mock storefront for apparel and merchandise exploration. |
+| **Flipkart Affiliate API** | Retailer Feed | **Standby** | ₹0 (Partner Approval) | Official retailer adapter; safely routed to fixture fallback until partner verification is complete. |
+| **Amazon India** | Retailer | **Mock-Only** | Compliance Policy | Anti-scraping policy compliance; non-sample requests are strictly rejected. |
+| **eBay Browse API** | REST API | **Ready (Unconfigured)** | ₹0 (Free Tier) | Genuine marketplace provider adapter using OAuth 2.0 Client Credentials; safely remains dormant until credentials are provided. |
+
+### Data Model Separation
+1. **Canonical Product:** Normalized identity (`title`, `brand`, `model`, `variant`, `category`, `imageUrl`, `canonicalKey`, `sourceProvider`, `dataStatus`).
+2. **Catalog Source Record:** External provider source (`provider`, `externalProductId`, `sourceUrl`, `dataStatus`, `lastFetchedAt`).
+3. **Retailer Offer:** Store-specific listing (`productId`, `provider`, `priceInPaise`, `currency`, `availability`, `isSample`, `dataStatus`).
+4. **Price Observation:** Historical record (`offerId`, `priceInPaise`, `status`, `errorMessage`, `fetchedAt`).
+
+### Data Transparency Guarantee
+- **Clear Badging:** Every offer and product is distinctly labeled (`Live Retailer` vs `Sample Data`).
+- **No False Market Savings:** `calculateGenuineSavings` strictly prohibits claiming real market savings from sample data or cross-currency comparisons.
+- **Monitoring Safety:** External sample catalog items are excluded from live price monitoring; fixture demo alerts are clearly marked `[PriceRadar Demo Alert]`.
+
+---
+
+## 5. Repository Structure
 
 ```
 PriceRadar/

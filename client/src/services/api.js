@@ -47,14 +47,23 @@ export function getMe() {
 }
 
 // =========================================================================
-// Products and offers — Document 1 Section 6.2
+// Products and offers — Document 1 Section 6.2 & Multi-Provider Architecture
 // =========================================================================
-export function searchProducts(q) {
-  return unwrap(api.get('/api/products/search', { params: { q } }));
+export function searchProducts(q, options = {}) {
+  const params = typeof q === 'object' ? q : { q, ...options };
+  return unwrap(api.get('/api/products/search', { params }));
 }
 
 export function getProduct(productId) {
   return unwrap(api.get(`/api/products/${productId}`));
+}
+
+export function getCategories() {
+  return unwrap(api.get('/api/products/categories'));
+}
+
+export function getProviderStatus() {
+  return unwrap(api.get('/api/products/providers/status'));
 }
 
 export function getOfferHistory(offerId) {

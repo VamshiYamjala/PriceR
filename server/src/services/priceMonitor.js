@@ -68,6 +68,11 @@ export async function runMonitoringCycle() {
       const offer = await Offer.findById(offerId);
       if (!offer) continue;
 
+      // Do not attempt live price monitoring for DummyJSON or mock.shop sample catalogs (Prompt Section 11)
+      if (offer.provider === 'dummyjson' || offer.provider === 'mockshop') {
+        continue;
+      }
+
       const fetchResult = await fetchOffer(offer);
       offersChecked++;
 
@@ -104,21 +109,27 @@ export async function runMonitoringCycle() {
             const user = await User.findById(alert.userId);
             if (user) {
               const channels = Array.isArray(alert.channels) && alert.channels.length > 0 ? alert.channels : ['email'];
+              const isSampleOffer = Boolean(offer.isSample || offer.dataStatus === 'sample');
+              const subjectTag = isSampleOffer ? '[PriceRadar Demo Alert]' : '[PriceRadar Alert]';
+              const demoNotice = isSampleOffer
+                ? '\n\n(Notice: This alert was triggered by a simulated sample/demo offer, not a verified live retailer drop.)'
+                : '';
+
               for (const channel of channels) {
                 let sendResult = { success: false, errorMessage: null };
-                const message = evalResult.reason;
+                const message = `${evalResult.reason}${demoNotice}`;
 
                 if (channel === 'email') {
                   sendResult = await sendEmail({
                     to: user.email,
-                    subject: `[PriceRadar Alert] ${offer.title}`,
-                    text: `Hello ${user.name},\n\n${evalResult.reason}\n\nView offer: ${offer.productUrl}\n\nPriceRadar Team`,
+                    subject: `${subjectTag} ${offer.title}`,
+                    text: `Hello ${user.name},\n\n${evalResult.reason}${demoNotice}\n\nView offer: ${offer.productUrl}\n\nPriceRadar Team`,
                   });
                 } else if (channel === 'telegram') {
                   if (user.telegramChatId) {
                     sendResult = await sendMessage({
                       chatId: user.telegramChatId,
-                      text: `<b>PriceRadar Alert!</b>\n\n${evalResult.reason}\n\n<a href="${offer.productUrl}">View Offer</a>`,
+                      text: `<b>${subjectTag}</b>\n\n${evalResult.reason}${demoNotice ? '<i>' + demoNotice + '</i>' : ''}\n\n<a href="${offer.productUrl}">View Offer</a>`,
                     });
                   } else {
                     sendResult = {

@@ -10,7 +10,7 @@ const offerSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ['flipkart', 'amazon'],
+      enum: ['flipkart', 'amazon', 'dummyjson', 'mockshop', 'ebay', 'fixture'],
       required: true,
     },
     externalProductId: {
@@ -34,6 +34,14 @@ const offerSchema = new mongoose.Schema(
         message: 'priceInPaise must be an integer (rupees x 100, rounded)',
       },
     },
+    originalPrice: {
+      type: Number,
+      required: false,
+    },
+    originalCurrency: {
+      type: String,
+      required: false,
+    },
     currency: {
       type: String,
       required: true,
@@ -48,6 +56,11 @@ const offerSchema = new mongoose.Schema(
       type: Boolean,
       required: true,
       default: true,
+    },
+    dataStatus: {
+      type: String,
+      enum: ['sample', 'live', 'cached', 'unavailable'],
+      default: 'sample',
     },
     lastFetchedAt: {
       type: Date,

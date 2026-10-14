@@ -30,6 +30,33 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    category: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: false,
+    },
+    sourceProvider: {
+      type: String,
+      required: false,
+      default: 'fixture',
+    },
+    externalId: {
+      type: String,
+      required: false,
+    },
+    sourceUrl: {
+      type: String,
+      required: false,
+    },
+    dataStatus: {
+      type: String,
+      enum: ['sample', 'live', 'cached', 'unavailable'],
+      default: 'sample',
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
