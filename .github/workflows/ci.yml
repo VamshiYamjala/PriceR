@@ -8,11 +8,8 @@ on:
 
 jobs:
   backend-test:
-    name: Backend Tests & Lint
+    name: Backend Tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -23,7 +20,35 @@ jobs:
           node-version: "20"
 
       - name: Install server dependencies
-        run: npm install
+        working-directory: server
+        run: npm ci
 
       - name: Run backend tests
+        working-directory: server
+        env:
+          NODE_ENV: test
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ci-test-secret-at-least-32-characters-long
+          MONITOR_TRIGGER_SECRET: ci-monitor-secret-12345
+          MONITORING_ENABLED: "false"
         run: npm test
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: client
+        run: npm run build

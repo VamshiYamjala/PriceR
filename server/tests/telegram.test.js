@@ -10,7 +10,10 @@ describe('Telegram Account Linking API (Document 1 Section 6.5)', () => {
   let userId;
   let userToken;
 
+  const hasDb = Boolean(process.env.MONGODB_URI);
+
   beforeAll(async () => {
+    if (!hasDb) return;
     if (mongoose.connection.readyState === 0) {
       await connectDB();
     }
@@ -24,6 +27,7 @@ describe('Telegram Account Linking API (Document 1 Section 6.5)', () => {
   });
 
   afterAll(async () => {
+    if (!hasDb) return;
     if (userId) {
       await User.findByIdAndDelete(userId);
     }

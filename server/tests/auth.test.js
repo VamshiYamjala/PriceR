@@ -11,13 +11,17 @@ describe('Authentication & Authorization API (Document 1 Section 6.1)', () => {
   let authToken = '';
   let createdUserId = '';
 
+  const hasDb = Boolean(process.env.MONGODB_URI);
+
   beforeAll(async () => {
+    if (!hasDb) return;
     if (mongoose.connection.readyState === 0) {
       await connectDB();
     }
   });
 
   afterAll(async () => {
+    if (!hasDb) return;
     // Clean up test user
     if (createdUserId) {
       await User.findByIdAndDelete(createdUserId);
