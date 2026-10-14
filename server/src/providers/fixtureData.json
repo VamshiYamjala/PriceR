@@ -1,0 +1,182 @@
+[
+  {
+    "canonicalKey": "samsung-galaxy-m14-5g-128gb-icy-silver",
+    "title": "Samsung Galaxy M14 5G",
+    "brand": "Samsung",
+    "model": "Galaxy M14 5G",
+    "variant": "128GB, Icy Silver",
+    "imageUrl": "https://images.priceradar.sample/samsung-m14-5g.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-SGM14-128-SLV",
+        "title": "SAMSUNG Galaxy M14 5G (Icy Silver, 128 GB)",
+        "priceInPaise": 1349900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/samsung-galaxy-m14-5g-icy-silver-128-gb/p/sample-sgm14",
+        "forceFail": false
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-SGM14-128-SLV",
+        "title": "Samsung Galaxy M14 5G (Icy Silver, 128GB)",
+        "priceInPaise": 1369900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-SGM14SLV",
+        "forceFail": false
+      }
+    ]
+  },
+  {
+    "canonicalKey": "redmi-note-13-5g-128gb-starburst-white",
+    "title": "Redmi Note 13 5G",
+    "brand": "Redmi",
+    "model": "Note 13 5G",
+    "variant": "128GB, Starburst White",
+    "imageUrl": "https://images.priceradar.sample/redmi-note-13-5g.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-RDMN13-128-WHT",
+        "title": "Redmi Note 13 5G (Starburst White, 128 GB)",
+        "priceInPaise": 1699900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/redmi-note-13-5g-starburst-white-128-gb/p/sample-rdmn13",
+        "forceFail": false
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-RDMN13-128-WHT",
+        "title": "Redmi Note 13 5G (Starburst White, 128GB)",
+        "priceInPaise": 1719900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-RDMN13WHT",
+        "forceFail": false
+      }
+    ]
+  },
+  {
+    "canonicalKey": "boat-airdopes-141-black",
+    "title": "boAt Airdopes 141",
+    "brand": "boAt",
+    "model": "Airdopes 141",
+    "variant": "Black",
+    "imageUrl": "https://images.priceradar.sample/boat-airdopes-141.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-BOAT141-BLK",
+        "title": "boAt Airdopes 141 Bluetooth Truly Wireless Earbuds",
+        "priceInPaise": 129900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/boat-airdopes-141/p/sample-boat141",
+        "forceFail": false
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-BOAT141-BLK",
+        "title": "boAt Airdopes 141 TWS Earbuds, Black",
+        "priceInPaise": 134900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-BOAT141BLK",
+        "forceFail": false
+      }
+    ]
+  },
+  {
+    "canonicalKey": "noise-colorfit-pulse-2-black",
+    "title": "Noise ColorFit Pulse 2",
+    "brand": "Noise",
+    "model": "ColorFit Pulse 2",
+    "variant": "Jet Black",
+    "imageUrl": "https://images.priceradar.sample/noise-colorfit-pulse-2.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-NOISE-PULSE2-BLK",
+        "title": "Noise ColorFit Pulse 2 Smart Watch, Jet Black",
+        "priceInPaise": 179900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/noise-colorfit-pulse-2/p/sample-noisepulse2",
+        "forceFail": true
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-NOISE-PULSE2-BLK",
+        "title": "Noise ColorFit Pulse 2 Smartwatch, Jet Black",
+        "priceInPaise": 184900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-NOISEPULSE2",
+        "forceFail": false
+      }
+    ]
+  },
+  {
+    "canonicalKey": "mi-power-bank-3i-20000mah",
+    "title": "Mi Power Bank 3i",
+    "brand": "Mi",
+    "model": "Power Bank 3i",
+    "variant": "20000mAh, Black",
+    "imageUrl": "https://images.priceradar.sample/mi-power-bank-3i.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-MIPB3I-20K-BLK",
+        "title": "Mi Power Bank 3i 20000 mAh",
+        "priceInPaise": 169900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/mi-power-bank-3i-20000-mah/p/sample-mipb3i",
+        "forceFail": false
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-MIPB3I-20K-BLK",
+        "title": "Mi 20000mAh Power Bank 3i",
+        "priceInPaise": 174900,
+        "currency": "INR",
+        "availability": "out_of_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-MIPB3I20K",
+        "forceFail": false
+      }
+    ]
+  },
+  {
+    "canonicalKey": "hp-15s-ryzen5-8gb-512gb",
+    "title": "HP 15s Laptop",
+    "brand": "HP",
+    "model": "15s",
+    "variant": "Ryzen 5, 8GB RAM, 512GB SSD",
+    "imageUrl": "https://images.priceradar.sample/hp-15s-ryzen5.jpg",
+    "offers": [
+      {
+        "provider": "flipkart",
+        "externalProductId": "FLP-HP15S-R5-8-512",
+        "title": "HP 15s Ryzen 5 Hexa Core 5500U - (8 GB/512 GB SSD)",
+        "priceInPaise": 4199900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.flipkart.com/hp-15s-ryzen5-8gb-512gb/p/sample-hp15s",
+        "forceFail": false
+      },
+      {
+        "provider": "amazon",
+        "externalProductId": "AMZ-HP15S-R5-8-512",
+        "title": "HP 15s, AMD Ryzen 5, 8GB RAM, 512GB SSD",
+        "priceInPaise": 4299900,
+        "currency": "INR",
+        "availability": "in_stock",
+        "productUrl": "https://www.amazon.in/dp/sample-HP15SR5",
+        "forceFail": false
+      }
+    ]
+  }
+]

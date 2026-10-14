@@ -1,0 +1,39 @@
+:root {
+  --pr-primary: #0F6E56;
+  --pr-text: #1C1C1A;
+  --pr-muted: #6B6B66;
+  --pr-bg: #F5F5F4;
+  --pr-surface: #FFFFFF;
+  --pr-border: #E2E1DB;
+  --pr-success: #1D9E75;
+  --pr-warning: #B8860B;
+  --pr-error: #A32D2D;
+  --pr-sample-bg: #ECECE8;
+  --pr-sample-text: #6B6B66;
+}
+
+body {
+  background-color: var(--pr-bg);
+  color: var(--pr-text);
+}
+
+.btn-primary {
+  background-color: var(--pr-primary);
+  border-color: var(--pr-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #0b5341;
+  border-color: #0b5341;
+}
+
+a {
+  color: var(--pr-primary);
+}
+
+.badge-sample {
+  background-color: var(--pr-sample-bg);
+  color: var(--pr-sample-text);
+  border: 1px solid var(--pr-border);
+}

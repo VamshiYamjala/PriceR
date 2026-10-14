@@ -1,0 +1,21 @@
+name: Hourly Price Monitor
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Runs every hour on the hour (UTC)
+  workflow_dispatch:        # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  trigger-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call POST /api/monitor/run
+        run: |
+          STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST "${{ secrets.BACKEND_URL }}/api/monitor/run" -H "X-Monitor-Secret: ${{ secrets.MONITOR_TRIGGER_SECRET }}")
+          echo "HTTP status: $STATUS"
+          echo "Response body:"
+          cat response.json
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::Monitor trigger failed with HTTP status $STATUS"
+            exit 1
+          fi

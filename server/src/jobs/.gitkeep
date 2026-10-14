@@ -1,0 +1,3 @@
+# server/src/jobs/.gitkeep
+# Kept for local development convenience only.
+# Production scheduled execution runs via GitHub Actions (.github/workflows/monitor.yml).
