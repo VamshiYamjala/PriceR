@@ -1,5 +1,14 @@
 // server/src/server.js
-import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Explicitly resolve server/.env so running from repo root or server dir both work reliably
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config(); // fallback to current working directory if different
+
 import app from './app.js';
 import connectDB from './config/db.js';
 

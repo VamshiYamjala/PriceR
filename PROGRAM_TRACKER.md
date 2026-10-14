@@ -254,5 +254,50 @@ PriceRadar/
 - **Errors Encountered:**
   - ERR-003: `ReferenceError` in `tests/priceComparison.test.js` line 39 (Fixed & Verified).
 - **Git Commit Hash:** `a5265ff` (pushed to `origin/main`).
-- **Next Task:** Phase 3/4: Database setup checkpoint (MongoDB Atlas cluster creation and connection).
+- **Next Task:** Phase 4: Database setup checkpoint (MongoDB Atlas cluster creation, connection, and seeding).
+
+---
+
+### Task 3: MongoDB Atlas Connection, Fixture Seeding, Idempotency & Search Tests
+- **Date & Time:** 2026-10-14 14:55 IST
+- **Phase:** Phase 4 — Database Setup, Live Connection & Seeding Verification
+- **Files Created / Modified:**
+  - `server/src/jobs/verifyDbConnection.js` (Created safe connection and ping verifier)
+  - `server/src/config/db.js` (Updated to auto-load server/.env when needed)
+  - `server/src/server.js` (Updated to explicitly resolve server/.env path)
+  - `server/package.json` (Added `db:verify` script)
+  - `server/tests/products.test.js` (Created search and detail integration tests against seeded database)
+- **What Changed:**
+  - User configured `server/.env` with MongoDB Atlas cluster credentials (excluded from git by `.gitignore`).
+  - Executed safe verification script `npm run db:verify`, confirming TLS connection and admin database ping to cluster `cluster0.9bgvpx9.mongodb.net`.
+  - Executed `npm run seed:fixtures`, upserting 6 products and 12 offers from `fixtureData.json` into MongoDB Atlas database `priceradar`.
+  - Re-ran `seedFixtures` and verified collection count idempotency: `Product.countDocuments() === 6`, `Offer.countDocuments() === 12` with 0 duplicate records created.
+  - Implemented and verified integration tests in `tests/products.test.js`:
+    - `GET /api/products/search` (empty query $\rightarrow$ empty array `[]`)
+    - `GET /api/products/search?q=Samsung` (returns matched products with offers containing provider, price in paise, and `isSample: true`)
+    - `GET /api/products/:productId` (returns `{ product, offers }` matching Master Guide Section 6.2)
+    - `GET /api/products/:productId` with non-existent ID (returns 404 `NOT_FOUND`)
+- **Commands Executed:**
+  ```powershell
+  npm --prefix "d:\priceR\server" run db:verify
+  npm --prefix "d:\priceR\server" run seed:fixtures
+  npm --prefix "d:\priceR\server" test
+  npm --prefix "d:\priceR\client" run build
+  ```
+- **Tests Performed & Actual Results:**
+  - `db:verify`: Mongoose connected successfully and admin ping passed.
+  - Database Seeder: Upserted 6 products, 12 offers. Second run confirmed exact same count (no duplicates).
+  - Jest Test Suites: 7/7 passed, 49/49 tests green:
+    - `tests/products.test.js`: 4 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/priceComparison.test.js`: 9 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+  - Vite client build: 107 modules compiled with 0 errors.
+- **Errors Encountered:** None.
+- **Git Commit Hash:** Pending checkpoint commit.
+- **Next Task:** Phase 5 & 6: Authentication, User Registration & Login, Watchlists, and Alert Management APIs.
+
 
