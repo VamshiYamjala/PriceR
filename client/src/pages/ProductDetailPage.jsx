@@ -6,6 +6,7 @@ import OfferRow from '../components/OfferRow';
 export default function ProductDetailPage() {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -16,6 +17,7 @@ export default function ProductDetailPage() {
       try {
         const data = await api.getProduct(productId);
         setProduct(data?.product || data);
+        setOffers(data?.offers || data?.product?.offers || []);
       } catch (err) {
         setError(err.response?.data?.error?.message || 'Product not found');
       } finally {
@@ -47,8 +49,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  const offers = product.offers || [];
-  const validOffers = offers.filter((o) => o.availability !== 'out_of_stock');
+  const validOffers = offers.filter((o) => o.availability !== 'out_of_stock' && o.lastStatus !== 'error');
   const lowestOfferId =
     validOffers.length > 0
       ? validOffers.reduce((min, o) => (o.priceInPaise < min.priceInPaise ? o : min)).id
@@ -65,13 +66,26 @@ export default function ProductDetailPage() {
       </nav>
 
       <div className="card shadow-sm mb-4">
-        <div className="card-body">
-          <h1 className="h4 mb-1">{product.title}</h1>
-          <p className="text-muted small mb-3">
-            {[product.brand, product.model, product.variant].filter(Boolean).join(' · ')}
-          </p>
+        <div className="card-body p-4">
+          <div className="d-flex flex-column flex-md-row gap-4 align-items-md-center mb-4">
+            {product.imageUrl && (
+              <img
+                src={product.imageUrl}
+                alt={product.title}
+                className="img-fluid rounded border p-2"
+                style={{ maxHeight: '180px', objectFit: 'contain' }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            )}
+            <div>
+              <h1 className="h4 mb-1">{product.title}</h1>
+              <p className="text-muted small mb-0">
+                {[product.brand, product.model, product.variant].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+          </div>
 
-          <h2 className="h6 fw-bold mb-3">Available Retailer Offers</h2>
+          <h2 className="h6 fw-bold mb-3">Available Retailer Offers & Prices</h2>
           {offers.length === 0 ? (
             <p className="text-muted small">No retailer offers found for this product.</p>
           ) : (

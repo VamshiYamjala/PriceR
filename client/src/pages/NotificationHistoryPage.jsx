@@ -9,7 +9,7 @@ export default function NotificationHistoryPage() {
     async function loadNotifications() {
       try {
         const data = await api.getNotifications();
-        setEvents(data?.notifications || []);
+        setEvents(data?.events || data?.notifications || []);
       } catch (err) {
         console.error('Failed to load notification events:', err);
       } finally {

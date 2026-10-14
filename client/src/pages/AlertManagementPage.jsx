@@ -20,7 +20,20 @@ export default function AlertManagementPage() {
     loadAlerts();
   }, []);
 
+  async function handleToggleStatus(alert) {
+    const nextStatus = alert.status === 'active' ? 'paused' : 'active';
+    try {
+      const data = await api.updateAlert(alert.id, { status: nextStatus });
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === alert.id ? { ...a, status: data.alert?.status || nextStatus } : a))
+      );
+    } catch (err) {
+      console.error('Failed to toggle alert status:', err);
+    }
+  }
+
   async function handleDelete(id) {
+    if (!window.confirm('Are you sure you want to delete this alert?')) return;
     try {
       await api.deleteAlert(id);
       setAlerts((prev) => prev.filter((a) => a.id !== id));
@@ -55,9 +68,9 @@ export default function AlertManagementPage() {
         <div className="d-flex flex-column gap-3">
           {alerts.map((alert) => (
             <div key={alert.id} className="card shadow-sm">
-              <div className="card-body d-flex justify-content-between align-items-center">
+              <div className="card-body d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
-                  <h2 className="h6 mb-1">{alert.offer?.title || 'Alert Rule'}</h2>
+                  <h2 className="h6 mb-1">{alert.offer?.title || `Alert Rule (${alert.id.substring(0, 8)})`}</h2>
                   <div className="small text-muted mb-2">
                     Type: <span className="fw-semibold">{alert.type === 'target_price' ? 'Target Price' : 'Fixed Drop'}</span>
                     {' · '}
@@ -73,12 +86,24 @@ export default function AlertManagementPage() {
                     <span className={`badge ${alert.status === 'active' ? 'bg-success' : 'bg-secondary'} me-2`}>
                       {alert.status}
                     </span>
+                    <span className={`badge ${alert.armed ? 'bg-info text-dark' : 'bg-warning text-dark'} me-2`}>
+                      {alert.armed ? 'Armed' : 'Disarmed (Notified)'}
+                    </span>
                     <span className="badge bg-light text-dark border">
                       Channels: {(alert.channels || []).join(', ')}
                     </span>
                   </div>
                 </div>
-                <div>
+                <div className="d-flex gap-2">
+                  <button
+                    className={`btn btn-sm ${alert.status === 'active' ? 'btn-outline-warning' : 'btn-outline-success'}`}
+                    onClick={() => handleToggleStatus(alert)}
+                  >
+                    {alert.status === 'active' ? 'Pause' : 'Resume'}
+                  </button>
+                  <Link to={`/alerts/${alert.id}/edit`} className="btn btn-outline-secondary btn-sm">
+                    Edit
+                  </Link>
                   <button className="btn btn-outline-danger btn-sm" onClick={() => handleDelete(alert.id)}>
                     Delete
                   </button>

@@ -118,8 +118,12 @@ export function updateNotificationPreferences({ email }) {
   return unwrap(api.put('/api/notification-preferences', { email }));
 }
 
-export function linkTelegram(linkCode) {
-  return unwrap(api.post('/api/telegram/link-code', { linkCode }));
+export function getTelegramLinkCode() {
+  return unwrap(api.post('/api/telegram/link-code'));
+}
+
+export function linkTelegram(linkCode, chatId) {
+  return unwrap(api.post('/api/telegram/link', { linkCode, chatId }));
 }
 
 export default api;

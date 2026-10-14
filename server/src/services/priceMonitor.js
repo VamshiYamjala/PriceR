@@ -1,17 +1,21 @@
 // server/src/services/priceMonitor.js
-// Owner: Member 1
+// Owner: Member 1 & Member 4
 // Orchestrates the scheduled monitoring cycle:
 // 1. Fetches each tracked offer once per cycle via providers dispatcher
 // 2. Records PriceObservation entries
 // 3. Updates Offer documents with lastFetchedAt, lastSuccessAt, and lastStatus
 // 4. Evaluates all active alerts that depend on updated offers
-// 5. Triggers email/telegram notifications through notification services
+// 5. Triggers email/telegram notifications through notification services and logs NotificationEvent
 
 import { fetchOffer } from '../providers/index.js';
 import Offer from '../models/Offer.js';
 import PriceObservation from '../models/PriceObservation.js';
 import Alert from '../models/Alert.js';
+import User from '../models/User.js';
+import NotificationEvent from '../models/NotificationEvent.js';
 import { evaluateAlert } from './alertEvaluator.js';
+import { sendEmail } from './notifications/email.js';
+import { sendMessage } from './notifications/telegram.js';
 
 // In-memory monitoring state for reporting via GET /api/monitor/status
 let monitorState = {
@@ -51,7 +55,7 @@ export async function runMonitoringCycle() {
   console.log('[monitor] Starting price monitoring cycle...');
   monitorState.isRunning = true;
 
-  // Find distinct offers associated with active alerts or watchlists
+  // Find distinct offers associated with active alerts
   const activeAlerts = await Alert.find({ status: 'active' }).populate('offerId');
   const distinctOfferIds = [...new Set(activeAlerts.map((a) => a.offerId?._id?.toString()).filter(Boolean))];
 
@@ -95,14 +99,61 @@ export async function runMonitoringCycle() {
             alert.armed = false;
             alert.lastTriggeredAt = new Date();
             await alert.save();
-            // Member 4's notification dispatch is invoked here
+
+            // Dispatch multi-channel notifications and record NotificationEvent
+            const user = await User.findById(alert.userId);
+            if (user) {
+              const channels = Array.isArray(alert.channels) && alert.channels.length > 0 ? alert.channels : ['email'];
+              for (const channel of channels) {
+                let sendResult = { success: false, errorMessage: null };
+                const message = evalResult.reason;
+
+                if (channel === 'email') {
+                  sendResult = await sendEmail({
+                    to: user.email,
+                    subject: `[PriceRadar Alert] ${offer.title}`,
+                    text: `Hello ${user.name},\n\n${evalResult.reason}\n\nView offer: ${offer.productUrl}\n\nPriceRadar Team`,
+                  });
+                } else if (channel === 'telegram') {
+                  if (user.telegramChatId) {
+                    sendResult = await sendMessage({
+                      chatId: user.telegramChatId,
+                      text: `<b>PriceRadar Alert!</b>\n\n${evalResult.reason}\n\n<a href="${offer.productUrl}">View Offer</a>`,
+                    });
+                  } else {
+                    sendResult = {
+                      success: false,
+                      errorMessage: 'User has not linked their Telegram account.',
+                    };
+                  }
+                }
+
+                try {
+                  await NotificationEvent.create({
+                    userId: user._id,
+                    alertId: alert._id,
+                    channel,
+                    status: sendResult.success ? 'sent' : 'failed',
+                    message,
+                    errorMessage: sendResult.errorMessage || undefined,
+                    dedupeKey: `${evalResult.dedupeKey}:${channel}`,
+                  });
+                } catch (eventErr) {
+                  if (eventErr.code === 11000) {
+                    console.log(`[monitor] Duplicate notification suppressed by index for alert ${alert._id}`);
+                  } else {
+                    console.error('[monitor] Error recording NotificationEvent:', eventErr.message);
+                  }
+                }
+              }
+            }
           } else if (evalResult.shouldRearm) {
             alert.armed = true;
             await alert.save();
           }
         }
       } else {
-        // Record failure safely — never 0 rupees
+        // Record failure safely — never 0 rupees (Document 1 Section 10.6)
         errorsCount++;
         offer.lastFetchedAt = new Date();
         offer.lastStatus = 'error';

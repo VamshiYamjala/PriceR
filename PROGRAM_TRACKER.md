@@ -298,6 +298,52 @@ PriceRadar/
   - Vite client build: 107 modules compiled with 0 errors.
 - **Errors Encountered:** None.
 - **Git Commit Hash:** `5cb7db8` (pushed to `origin/main`).
-- **Next Task:** Phase 5: Authentication, User Registration & Login, and Authorization Tests.
+- **Next Task:** Phase 5 & 6: Authentication, User Registration & Login, Watchlists, Alerts, Telegram Linking & Monitor Dispatch.
+
+---
+
+### Task 4: Auth, Watchlist & Alerts with User Isolation, Telegram Linking & Monitor Dispatch
+- **Date & Time:** 2026-10-14 15:04 IST
+- **Phase:** Phase 5 & 6 — Authentication, Watchlists, Alerts, Multi-Channel Notifications & Frontend Wiring
+- **Files Created / Modified:**
+  - `server/src/services/priceMonitor.js` (Connected notification dispatch via Brevo and Telegram, logging NotificationEvent)
+  - `server/src/routes/telegram.js` (Implemented two-step Telegram account linking with in-memory code cache)
+  - `client/src/services/api.js` (Updated Telegram linking to call /api/telegram/link, added getTelegramLinkCode)
+  - `client/src/components/OfferRow.jsx` (Added Add to Watchlist and Set Alert buttons with authenticated status indicators)
+  - `client/src/pages/ProductDetailPage.jsx` (Extracted product and offers, added product image and offer actions)
+  - `client/src/pages/AlertFormPage.jsx` (Implemented Edit mode, pre-filling alert details, and updateAlert dispatch)
+  - `client/src/pages/AlertManagementPage.jsx` (Added Pause/Resume toggle and Edit link)
+  - `client/src/pages/NotificationHistoryPage.jsx` (Fixed data.events extraction to display event audit log)
+  - `server/tests/auth.test.js` (Created 10 integration tests: registration, bcrypt, JWT issuance, /me, and validation)
+  - `server/tests/telegram.test.js` (Created 3 integration tests: link-code generation, invalid code rejection, simulated linking)
+  - `server/tests/watchlistAndAlerts.test.js` (Created 12 integration tests: watchlist CRUD, alerts CRUD, pause/resume, and user isolation)
+- **What Changed:**
+  - Implemented full auth cycle with bcrypt hashing and JWT token issuance.
+  - Verified user isolation: User B cannot view, modify, or delete User A's watchlist items or alerts.
+  - Implemented two-step Telegram linking matching Document 1 Section 6.5 contract.
+  - Implemented multi-channel notification dispatch in `priceMonitor.js` with `NotificationEvent` recording and deduplication.
+  - Enhanced frontend UI for product details, alert management, and notification history.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix "d:\priceR\server" test
+  npm --prefix "d:\priceR\client" run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 10/10 passed, 74/74 tests green:
+    - `tests/watchlistAndAlerts.test.js`: 12 passed
+    - `tests/telegram.test.js`: 3 passed
+    - `tests/auth.test.js`: 10 passed
+    - `tests/products.test.js`: 4 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/priceComparison.test.js`: 9 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+  - Vite client build: 107 modules compiled with 0 errors.
+- **Errors Encountered:** None.
+- **Git Commit Hash:** Pending Phase 5/6 commit.
+- **Next Task:** Phase 7: Deployment configuration, CI/CD GitHub Actions workflows, and README documentation.
+
 
 
