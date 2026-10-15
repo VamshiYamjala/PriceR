@@ -544,4 +544,40 @@ describe('PriceRadar Notification Flow & Alert Engine Verification (10 Core Cond
       await NotificationEvent.findByIdAndDelete(mockEvent._id);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Condition 11: Recipient Resolution, Provider Message ID & Delivery Audit
+  // -------------------------------------------------------------------------
+  describe('Condition 11: Recipient Resolution, Provider Tracking & Channel Independence', () => {
+    it('should resolve recipient directly from alert owner and persist providerMessageId', async () => {
+      if (!hasDb) return;
+
+      const event = await NotificationEvent.create({
+        userId: userA._id,
+        alertId: new mongoose.Types.ObjectId(),
+        channel: 'email',
+        status: 'sent',
+        recipient: userA.email,
+        providerMessageId: '<brevo-test-msg-12345@smtp-relay.brevo.com>',
+        message: 'Price dropped to target!',
+        dedupeKey: `audit_test_${Date.now()}`,
+      });
+
+      expect(event.recipient).toBe(userA.email);
+      expect(event.providerMessageId).toBe('<brevo-test-msg-12345@smtp-relay.brevo.com>');
+
+      // Query via /api/notifications
+      const res = await request(app)
+        .get('/api/notifications')
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      expect(res.status).toBe(200);
+      const targetEvt = res.body.data.events.find((e) => e.id === event._id.toString());
+      expect(targetEvt).toBeDefined();
+      expect(targetEvt.recipient).toBe(userA.email);
+      expect(targetEvt.providerMessageId).toBe('<brevo-test-msg-12345@smtp-relay.brevo.com>');
+
+      await NotificationEvent.findByIdAndDelete(event._id);
+    });
+  });
 });

@@ -6,6 +6,7 @@
 // (Document 1, Section 5.7) instead of crashing the monitoring cycle.
 
 import axios from 'axios';
+import { reloadEnv } from '../../config/env.js';
 
 const BREVO_SEND_URL = 'https://api.brevo.com/v3/smtp/email';
 const REQUEST_TIMEOUT_MS = 10000;
@@ -14,13 +15,16 @@ const REQUEST_TIMEOUT_MS = 10000;
  * Diagnostic helper that checks if Brevo configuration exists without exposing secret keys.
  */
 export function getEmailConfigStatus() {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromAddress = process.env.EMAIL_FROM;
-  const fromName = process.env.EMAIL_FROM_NAME || 'PriceRadar';
+  if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
+    reloadEnv();
+  }
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  const fromAddress = (process.env.EMAIL_FROM || '').trim();
+  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim();
 
   return {
-    configured: Boolean(apiKey && apiKey.trim() && fromAddress && fromAddress.trim()),
-    hasApiKey: Boolean(apiKey && apiKey.trim()),
+    configured: Boolean(apiKey && fromAddress),
+    hasApiKey: Boolean(apiKey),
     fromAddress: fromAddress || null,
     fromName,
   };
@@ -33,16 +37,29 @@ export function getEmailConfigStatus() {
  * @param {string} params.subject
  * @param {string} params.text - plain-text body
  * @param {string} [params.html] - optional HTML body; falls back to styled PriceRadar HTML template
- * @returns {Promise<{success: boolean, providerMessageId?: string, errorMessage?: string}>}
+ * @returns {Promise<{success: boolean, providerMessageId?: string, recipient?: string, errorMessage?: string}>}
  */
 export async function sendEmail({ to, subject, text, html }) {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromAddress = process.env.EMAIL_FROM;
-  const fromName = process.env.EMAIL_FROM_NAME || 'PriceRadar';
+  if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
+    reloadEnv();
+  }
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  const fromAddress = (process.env.EMAIL_FROM || '').trim();
+  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim();
+  const recipient = (to || '').trim();
+
+  if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    return {
+      success: false,
+      recipient: recipient || null,
+      errorMessage: `Invalid recipient email address: "${to}".`,
+    };
+  }
 
   if (!apiKey || !fromAddress) {
     return {
       success: false,
+      recipient,
       errorMessage: 'BREVO_API_KEY or EMAIL_FROM is not configured in server/.env.',
     };
   }
@@ -69,7 +86,7 @@ export async function sendEmail({ to, subject, text, html }) {
       BREVO_SEND_URL,
       {
         sender: { email: fromAddress, name: fromName },
-        to: [{ email: to }],
+        to: [{ email: recipient }],
         subject,
         textContent: text,
         htmlContent,
@@ -86,6 +103,7 @@ export async function sendEmail({ to, subject, text, html }) {
 
     return {
       success: true,
+      recipient,
       providerMessageId: response.data?.messageId || null,
     };
   } catch (err) {
@@ -99,6 +117,7 @@ export async function sendEmail({ to, subject, text, html }) {
 
     return {
       success: false,
+      recipient,
       errorMessage: status
         ? `Brevo API error ${status}: ${detail}`
         : `Brevo API request failed: ${detail}`,

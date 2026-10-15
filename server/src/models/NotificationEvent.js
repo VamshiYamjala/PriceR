@@ -31,6 +31,14 @@ const notificationEventSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    recipient: {
+      type: String,
+      required: false,
+    },
+    providerMessageId: {
+      type: String,
+      required: false,
+    },
     dedupeKey: {
       type: String,
       required: true,

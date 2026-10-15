@@ -16,6 +16,8 @@ export const listNotifications = asyncHandler(async (req, res) => {
         alertId: e.alertId.toString(),
         channel: e.channel,
         status: e.status,
+        recipient: e.recipient ?? null,
+        providerMessageId: e.providerMessageId ?? null,
         message: e.message,
         errorMessage: e.errorMessage ?? null,
         createdAt: e.createdAt,

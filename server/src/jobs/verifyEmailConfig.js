@@ -56,9 +56,28 @@ async function main() {
   }
 
   // Explicit test sending mode
-  const targetRecipient = process.argv.find((arg) => arg.startsWith('--to='))
+  let targetRecipient = process.argv.find((arg) => arg.startsWith('--to='))
     ? process.argv.find((arg) => arg.startsWith('--to=')).split('=')[1]
-    : status.fromAddress;
+    : null;
+
+  if (!targetRecipient && process.env.MONGODB_URI) {
+    try {
+      const mongoose = await import('mongoose');
+      if (mongoose.default.connection.readyState === 0) {
+        await mongoose.default.connect(process.env.MONGODB_URI);
+      }
+      const User = mongoose.default.models.User || mongoose.default.model('User', new mongoose.default.Schema({ email: String, name: String }));
+      const user = await User.findOne().sort({ createdAt: -1 });
+      if (user && user.email) {
+        targetRecipient = user.email;
+        console.log(`\n📌 Targeted registered PriceRadar account: ${user.email} (Pass --to=<email> to override)`);
+      }
+    } catch (_) {}
+  }
+
+  if (!targetRecipient) {
+    targetRecipient = status.fromAddress;
+  }
 
   console.log(`\n🚀 Sending controlled test email to: ${targetRecipient}...`);
 

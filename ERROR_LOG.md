@@ -222,3 +222,51 @@ Whenever an error occurs during development:
   - Distinguish SMTP passwords from REST API keys in environment configuration diagnostics.
 - **Related Errors:** None.
 
+---
+
+### ERR-008: Price-Alert Email Delivery Failure Due to In-Memory Stale Credentials & Missing Audit Metadata
+- **Date & Time:** 2026-10-15 12:15 IST
+- **Phase / Feature:** Phase 4 & 5 — Live Brevo Notification Delivery
+- **Status:** VERIFIED
+- **Exact Error Message:**
+  ```text
+  Brevo API error 401: Key not found. Note: The configured BREVO_API_KEY starts with 'xsmtpsib-' which is an SMTP password. Brevo REST API requires an API key starting with 'xkeysib-' from Brevo Console -> SMTP & API -> API Keys tab.
+  ```
+- **Relevant Command / File:** `server/src/services/alertDispatcher.js`, `server/src/services/notifications/email.js`, `server/src/controllers/notificationsController.js`
+- **Root Cause:**
+  1. The background server process (`node server/src/server.js`) had been started prior to the user updating `server/.env` with the valid `xkeysib-` Brevo REST API key. Node.js caches `process.env` at startup, so subsequent alert evaluations in the running process continued using the stale `xsmtpsib-` SMTP password in memory, causing Brevo to return 401 Unauthorized for alert dispatches.
+  2. While the CLI test runner (`npm run email:test`) loaded the updated file directly, it defaulted to `EMAIL_FROM` (`vamshiyamjala20@gmail.com`) rather than the active user account (`srinivasvamshi28@gmail.com`), creating the appearance that email worked generally while user alerts failed.
+  3. The `NotificationEvent` schema did not persist `recipient` or Brevo's returned `providerMessageId`, and the UI did not expose detailed failure reasons or distinguish provider acceptance from confirmed inbox arrival.
+- **Diagnostic Steps Performed:**
+  1. Inspected `NotificationEvent` collection in MongoDB Atlas; identified all email dispatches failed with 401 Unauthorized error details.
+  2. Verified recipient resolution in `alertDispatcher.js` correctly resolved the user's registered account email (`srinivasvamshi28@gmail.com`).
+  3. Tested Brevo REST API authentication with `GET https://api.brevo.com/v3/account` using the updated key; confirmed HTTP 200 OK with active send credits.
+- **Solution Attempted:**
+  1. Updated `server/src/config/env.js` with `reloadEnv()` to reload variables dynamically without requiring full server restarts.
+  2. Enhanced `email.js` with recipient email validation, dynamic env loading guard, and metadata return (`providerMessageId`, `recipient`).
+  3. Extended `NotificationEvent.js` model and `alertDispatcher.js` to persist `recipient` and `providerMessageId`, masking emails in logs for security.
+  4. Updated `notificationsController.js` and `NotificationHistoryPage.jsx` to render clear delivery statuses (Accepted by Brevo with Message ID, Delivered to Telegram, or Dispatch Failed with reason).
+  5. Restarted backend server process on port 5000 with the active `xkeysib-` REST API key.
+  6. Triggered one controlled verification alert dispatch through `dispatchAlertNotifications` to `srinivasvamshi28@gmail.com`; Brevo accepted the message with Provider Message ID `<202610150646.30592578245@smtp-relay.mailin.fr>`.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  - Controlled alert dispatch returned `success: true` with Brevo Message ID `<202610150646.30592578245@smtp-relay.mailin.fr>`.
+  - MongoDB Atlas `NotificationEvent` recorded `status: 'sent'`, `recipient: 'srinivasvamshi28@gmail.com'`, `providerMessageId`.
+  - Full server test suite: 19 test suites, 195 tests passed green.
+  - Client production build: Vite build passed cleanly in 897ms.
+- **Files Changed:**
+  - `server/src/config/env.js`
+  - `server/src/services/notifications/email.js`
+  - `server/src/services/alertDispatcher.js`
+  - `server/src/models/NotificationEvent.js`
+  - `server/src/controllers/notificationsController.js`
+  - `server/src/jobs/verifyEmailConfig.js`
+  - `client/src/pages/NotificationHistoryPage.jsx`
+  - `server/tests/emailService.test.js`
+  - `server/tests/notificationFlow.test.js`
+- **Prevention Steps:**
+  - Always restart running server processes or invoke dynamic configuration reloaders upon modifying `.env` secrets.
+  - Distinguish third-party provider acceptance (`messageId`) from end-user inbox confirmation in notification logs.
+- **Related Errors:** ERR-007.
+
+

@@ -13,4 +13,9 @@ const __dirname = path.dirname(__filename);
 const envPath = path.resolve(__dirname, '../../.env');
 dotenv.config({ path: envPath });
 
+export function reloadEnv() {
+  dotenv.config({ path: envPath, override: true });
+  return process.env;
+}
+
 export default process.env;

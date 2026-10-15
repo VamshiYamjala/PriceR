@@ -779,7 +779,43 @@ PriceRadar/
   - Jest Test Suites: 19/19 passed, 193/193 tests green.
   - Vite client production build: 107 modules compiled in 876ms with 0 errors.
   - Zero-secrets verification passed on git staging.
-- **Next Task:** Complete report to user.
+- **Next Task:** Task 14: Fix Price-Alert Email Delivery to Account Owner & Upgrade Delivery Audit Log.
+
+---
+
+### Task 14: Fix Price-Alert Email Delivery to Account Owner & Upgrade Delivery Audit Log
+- **Date & Time:** 2026-10-15 12:20 IST
+- **Phase:** Notification Delivery Path Fix & Recipient Verification
+- **Files Modified:**
+  - `server/src/config/env.js` (Added `reloadEnv` export to reload env without server restart)
+  - `server/src/services/notifications/email.js` (Added email input validation, dynamic env loading guard, recipient and message ID return)
+  - `server/src/services/alertDispatcher.js` (Enhanced user resolution, masked logging, persisted recipient and providerMessageId)
+  - `server/src/models/NotificationEvent.js` (Added `recipient` and `providerMessageId` fields)
+  - `server/src/controllers/notificationsController.js` (Exposed `recipient` and `providerMessageId` in `/api/notifications`)
+  - `server/src/jobs/verifyEmailConfig.js` (Added auto-detection of user account email when `--to` is omitted)
+  - `client/src/pages/NotificationHistoryPage.jsx` (Redesigned delivery log UI with recipient, provider acceptance status, message IDs, and failure reasons)
+  - `server/tests/emailService.test.js` (Added test cases for recipient validation, format enforcement, and return metadata)
+  - `server/tests/notificationFlow.test.js` (Added Condition 11 tests verifying recipient resolution and provider tracking)
+  - `ERROR_LOG.md` (Documented ERR-008 and resolution)
+  - `PROGRAM_TRACKER.md` (Documented Task 14 development ledger)
+- **What Changed:**
+  - Diagnosed root cause of alert email non-delivery: The background server process was still running with stale in-memory environment variables from before the `xkeysib-` REST API key was added, causing Brevo to return 401 Unauthorized for real alert evaluations.
+  - Verified that `alertDispatcher.js` correctly resolved the user's registered account email (`srinivasvamshi28@gmail.com`) rather than any hardcoded or sender address.
+  - Restarted backend server process with active `xkeysib-` credentials.
+  - Dispatched a controlled verification price alert via production `dispatchAlertNotifications` to `srinivasvamshi28@gmail.com`: Brevo accepted the message with Provider Message ID `<202610150646.30592578245@smtp-relay.mailin.fr>`.
+  - Upgraded Delivery Log at `/notifications` with explicit status indicators, provider message IDs, masked recipient display, and failure reason breakdowns.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server run email:verify
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 19/19 passed, 195/195 tests green.
+  - Vite client production build: 107 modules compiled in 897ms with 0 errors.
+  - Controlled price alert dispatch accepted by Brevo REST API with provider message ID.
+- **Next Task:** Verification complete. Provide comprehensive 9-point report to user.
+
 
 
 

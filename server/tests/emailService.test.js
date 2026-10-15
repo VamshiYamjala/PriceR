@@ -99,6 +99,20 @@ describe('Brevo Email Notification Service (Document 1 Section 5.7 & Guide 4)', 
       expect(result.errorMessage).toContain('Brevo API error 401: Key not found in account');
     });
 
+    it('should reject invalid recipient email addresses early without calling Brevo', async () => {
+      const postSpy = jest.spyOn(axios, 'post');
+
+      const result = await sendEmail({
+        to: 'not-an-email',
+        subject: 'Test Alert',
+        text: 'Price dropped!',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.errorMessage).toContain('Invalid recipient email address');
+      expect(postSpy).not.toHaveBeenCalled();
+    });
+
     it('should handle network timeouts or connection drops gracefully', async () => {
       jest.spyOn(axios, 'post').mockRejectedValueOnce(new Error('ETIMEDOUT: Connection timed out'));
 
@@ -110,6 +124,7 @@ describe('Brevo Email Notification Service (Document 1 Section 5.7 & Guide 4)', 
 
       expect(result.success).toBe(false);
       expect(result.errorMessage).toContain('Brevo API request failed: ETIMEDOUT');
+      expect(result.recipient).toBe('buyer@example.com');
     });
   });
 });
