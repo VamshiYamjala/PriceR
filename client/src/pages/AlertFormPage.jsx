@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as api from '../services/api';
 
 export default function AlertFormPage() {
@@ -10,18 +10,20 @@ export default function AlertFormPage() {
   const isEditMode = Boolean(alertId);
   const offerId = searchParams.get('offerId') || '';
 
+  const [offer, setOffer] = useState(null);
   const [type, setType] = useState('target_price');
   const [targetPrice, setTargetPrice] = useState('');
   const [dropAmount, setDropAmount] = useState('');
   const [channels, setChannels] = useState(['email']);
+  const [telegramLinked, setTelegramLinked] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
-    if (isEditMode) {
-      async function loadAlert() {
-        try {
+    async function loadData() {
+      try {
+        if (isEditMode) {
           const data = await api.getAlerts();
           const alert = data?.alerts?.find((a) => a.id === alertId);
           if (alert) {
@@ -35,18 +37,43 @@ export default function AlertFormPage() {
             if (Array.isArray(alert.channels)) {
               setChannels(alert.channels);
             }
+            if (alert.offer) {
+              setOffer(alert.offer);
+            } else if (alert.offerId) {
+              try {
+                const offRes = await api.getOffer(alert.offerId);
+                setOffer(offRes.offer);
+              } catch (_) {}
+            }
           } else {
             setError('Alert not found.');
           }
-        } catch (err) {
-          setError('Failed to load alert details.');
-        } finally {
-          setInitialLoading(false);
+        } else if (offerId) {
+          try {
+            const offRes = await api.getOffer(offerId);
+            setOffer(offRes.offer);
+          } catch (_) {}
         }
+      } catch (err) {
+        setError('Failed to load alert details.');
+      } finally {
+        setInitialLoading(false);
       }
-      loadAlert();
     }
-  }, [isEditMode, alertId]);
+    loadData();
+  }, [isEditMode, alertId, offerId]);
+
+  useEffect(() => {
+    async function loadPreferences() {
+      try {
+        const prefs = await api.getNotificationPreferences();
+        setTelegramLinked(Boolean(prefs?.telegramLinked));
+      } catch {
+        // Fallback: leave telegramLinked false
+      }
+    }
+    loadPreferences();
+  }, []);
 
   function toggleChannel(channel) {
     setChannels((prev) =>
@@ -103,7 +130,17 @@ export default function AlertFormPage() {
           <div className="card-body p-4">
             <h1 className="h5 mb-3">{isEditMode ? 'Edit Price Alert' : 'Create Price Alert'}</h1>
 
-            {error && <div className="alert alert-danger py-2">{error}</div>}
+            {offer && (
+              <div className="p-3 mb-3 rounded bg-light border">
+                <div className="fw-semibold text-dark small text-truncate mb-1">{offer.title}</div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="badge bg-white text-secondary border text-capitalize">{offer.provider}</span>
+                  <span className="fw-bold text-primary">
+                    Current Price: ₹{((offer.priceInPaise || 0) / 100).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
@@ -132,6 +169,11 @@ export default function AlertFormPage() {
                     value={targetPrice}
                     onChange={(e) => setTargetPrice(e.target.value)}
                   />
+                  {offer && typeof offer.priceInPaise === 'number' && Number(targetPrice) >= offer.priceInPaise / 100 && (
+                    <div className="alert alert-info py-2 px-3 mt-2 small mb-0">
+                      ⚡ <strong>Immediate Evaluation:</strong> Target price (₹{Number(targetPrice).toLocaleString('en-IN')}) is at or above the current offer price (₹{(offer.priceInPaise / 100).toLocaleString('en-IN')}). An alert notification will be evaluated and delivered immediately upon saving.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="mb-3">
@@ -167,9 +209,17 @@ export default function AlertFormPage() {
                     type="checkbox"
                     id="channel-telegram"
                     checked={channels.includes('telegram')}
+                    disabled={!telegramLinked}
                     onChange={() => toggleChannel('telegram')}
                   />
-                  <label className="form-check-label" htmlFor="channel-telegram">Telegram</label>
+                  <label className="form-check-label" htmlFor="channel-telegram">
+                    Telegram
+                    {!telegramLinked && (
+                      <span className="text-muted ms-2 small">
+                        (Not linked — <Link to="/settings/notifications">connect Telegram first</Link>)
+                      </span>
+                    )}
+                  </label>
                 </div>
               </div>
 

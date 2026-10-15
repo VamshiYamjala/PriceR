@@ -28,3 +28,33 @@ export const getOfferHistory = asyncHandler(async (req, res) => {
     },
   });
 });
+
+export const getOfferById = asyncHandler(async (req, res) => {
+  const offer = await Offer.findById(req.params.offerId);
+  if (!offer) {
+    return res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Offer not found.' },
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      offer: {
+        id: offer._id.toString(),
+        title: offer.title,
+        priceInPaise: offer.priceInPaise,
+        originalPriceInPaise: offer.originalPriceInPaise,
+        provider: offer.provider,
+        productUrl: offer.productUrl,
+        imageUrl: offer.imageUrl,
+        availability: offer.availability,
+        dataStatus: offer.dataStatus,
+        isSample: offer.isSample,
+      },
+    },
+  });
+});
+
+export default { getOfferHistory, getOfferById };

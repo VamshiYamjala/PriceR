@@ -49,4 +49,18 @@ export const getMonitorStatus = asyncHandler(async (req, res) => {
   });
 });
 
-export default { runMonitor, getMonitorStatus };
+export const triggerUserMonitor = asyncHandler(async (req, res) => {
+  const results = await runMonitoringCycle();
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      offersChecked: results.offersChecked,
+      triggeredAlerts: results.triggeredAlerts,
+      errors: results.errors,
+      completedAt: new Date().toISOString(),
+    },
+  });
+});
+
+export default { runMonitor, getMonitorStatus, triggerUserMonitor };

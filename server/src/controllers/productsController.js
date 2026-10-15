@@ -4,6 +4,7 @@ import Offer from '../models/Offer.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import * as dummyjsonProvider from '../providers/dummyjson.js';
 import * as mockshopProvider from '../providers/mockshop.js';
+import * as apifyProvider from '../providers/apify.js';
 
 function toOfferSummary(offer) {
   return {
@@ -73,8 +74,92 @@ export const searchProducts = asyncHandler(async (req, res) => {
     offers: offersByProduct.get(p._id.toString()) ?? [],
   }));
 
-  // 2. Query DummyJSON external catalog for discovery (unless filtered to fixture only)
-  if (providerFilter === 'all' || providerFilter === 'dummyjson') {
+  // 2. Query Apify Actor for genuine live retailer data (Amazon, Flipkart, Meesho)
+  const isApifyTargeted =
+    (providerFilter === 'all' && process.env.NODE_ENV !== 'test') ||
+    providerFilter === 'apify' ||
+    providerFilter === 'live' ||
+    ['amazon', 'flipkart', 'meesho'].includes(providerFilter);
+
+  if (isApifyTargeted && q && Product.db?.readyState === 1) {
+    const apifyConfig = apifyProvider.getApifyConfig();
+    if (apifyConfig.isConfigured) {
+      try {
+        let retailer = 'amazon';
+        if (providerFilter === 'flipkart') retailer = 'flipkart';
+        else if (providerFilter === 'meesho') retailer = 'meesho';
+        else if (req.query.retailer) retailer = req.query.retailer.toLowerCase();
+
+        const apifyRes = await apifyProvider.searchProducts(q, {
+          retailer,
+          limit: apifyConfig.maxItems,
+        });
+
+        if (apifyRes && Array.isArray(apifyRes.products) && apifyRes.products.length > 0) {
+          const liveItems = [];
+
+          for (const item of apifyRes.products) {
+            try {
+              const canonicalKey = item.canonicalKey || `apify-${item.sourceProvider || retailer}-${item.externalId}`.toLowerCase();
+              const persistedProduct = await Product.findOneAndUpdate(
+                { canonicalKey },
+                {
+                  title: item.title,
+                  brand: item.brand,
+                  model: item.model,
+                  variant: item.variant,
+                  category: item.category || 'general',
+                  description: item.description,
+                  imageUrl: item.imageUrl,
+                  sourceProvider: 'apify',
+                  externalId: item.externalId,
+                  sourceUrl: item.sourceUrl,
+                  dataStatus: 'live', // Genuine live retailer data
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+              );
+
+              const offerData = item.offers?.[0];
+              if (offerData && persistedProduct) {
+                const persistedOffer = await Offer.findOneAndUpdate(
+                  { provider: 'apify', externalProductId: String(offerData.externalProductId) },
+                  {
+                    productId: persistedProduct._id,
+                    title: offerData.title || item.title,
+                    productUrl: offerData.productUrl || item.sourceUrl,
+                    priceInPaise: offerData.priceInPaise,
+                    originalPrice: offerData.originalPrice,
+                    originalCurrency: offerData.originalCurrency,
+                    currency: offerData.currency || 'INR',
+                    availability: offerData.availability || 'in_stock',
+                    isSample: false,
+                    dataStatus: 'live',
+                    lastStatus: 'ok',
+                    lastSuccessAt: new Date(),
+                  },
+                  { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+
+                item.id = persistedProduct._id.toString();
+                item.offers = [toOfferSummary(persistedOffer)];
+                liveItems.push(item);
+              }
+            } catch (persistErr) {
+              console.warn('[search] Failed to persist Apify live item:', persistErr.message);
+            }
+          }
+
+          // Prepend genuine live products so they rank prominently above sample data
+          combined = liveItems.concat(combined);
+        }
+      } catch (apifyErr) {
+        console.warn('[search] Apify live search error:', apifyErr.message);
+      }
+    }
+  }
+
+  // 3. Query DummyJSON external catalog for discovery (unless filtered to fixture or live only)
+  if (providerFilter === 'all' || providerFilter === 'dummyjson' || providerFilter === 'sample') {
     try {
       const dummyRes = await dummyjsonProvider.searchProducts(q, { limit: 12 });
       if (dummyRes && Array.isArray(dummyRes.products)) {
@@ -84,6 +169,60 @@ export const searchProducts = asyncHandler(async (req, res) => {
             (p) => p.category?.toLowerCase() === category.toLowerCase()
           );
         }
+
+        // Persist external items to MongoDB so users can track them in watchlist and configure alerts
+        for (const item of dummyItems) {
+          try {
+            const canonicalKey = item.canonicalKey || `dummyjson-${item.externalId}`;
+            const persistedProduct = await Product.findOneAndUpdate(
+              { canonicalKey },
+              {
+                title: item.title,
+                brand: item.brand,
+                model: item.model,
+                variant: item.variant,
+                category: item.category || 'general',
+                description: item.description,
+                imageUrl: item.imageUrl,
+                sourceProvider: 'dummyjson',
+                externalId: item.externalId,
+                sourceUrl: item.sourceUrl,
+                dataStatus: 'sample', // Explicitly keep sample data labeled as sample
+              },
+              { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            // Persist associated offer
+            const offerData = item.offers?.[0];
+            if (offerData && persistedProduct) {
+              const persistedOffer = await Offer.findOneAndUpdate(
+                { provider: 'dummyjson', externalProductId: String(offerData.externalProductId) },
+                {
+                  productId: persistedProduct._id,
+                  title: offerData.title || item.title,
+                  productUrl: offerData.productUrl || item.sourceUrl,
+                  priceInPaise: offerData.priceInPaise,
+                  originalPrice: offerData.originalPrice,
+                  originalCurrency: offerData.originalCurrency,
+                  currency: offerData.currency || 'INR',
+                  availability: offerData.availability || 'in_stock',
+                  isSample: true,
+                  dataStatus: 'sample',
+                  lastStatus: 'ok',
+                  lastSuccessAt: new Date(),
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+              );
+
+              // Replace ephemeral in-memory IDs with genuine persisted MongoDB ObjectIds
+              item.id = persistedProduct._id.toString();
+              item.offers = [toOfferSummary(persistedOffer)];
+            }
+          } catch (persistErr) {
+            console.warn('[search] Failed to persist DummyJSON item:', persistErr.message);
+          }
+        }
+
         combined = combined.concat(dummyItems);
       }
     } catch (err) {
@@ -96,6 +235,55 @@ export const searchProducts = asyncHandler(async (req, res) => {
     try {
       const mockRes = await mockshopProvider.searchProducts(q, { limit: 6 });
       if (mockRes && Array.isArray(mockRes.products)) {
+        for (const item of mockRes.products) {
+          try {
+            const canonicalKey = item.canonicalKey || `mockshop-${item.externalId}`;
+            const persistedProduct = await Product.findOneAndUpdate(
+              { canonicalKey },
+              {
+                title: item.title,
+                brand: item.brand,
+                model: item.model,
+                variant: item.variant,
+                category: item.category || 'apparel',
+                description: item.description,
+                imageUrl: item.imageUrl,
+                sourceProvider: 'mockshop',
+                externalId: item.externalId,
+                sourceUrl: item.sourceUrl,
+                dataStatus: 'sample',
+              },
+              { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            const offerData = item.offers?.[0];
+            if (offerData && persistedProduct) {
+              const persistedOffer = await Offer.findOneAndUpdate(
+                { provider: 'mockshop', externalProductId: String(offerData.externalProductId) },
+                {
+                  productId: persistedProduct._id,
+                  title: offerData.title || item.title,
+                  productUrl: offerData.productUrl || item.sourceUrl,
+                  priceInPaise: offerData.priceInPaise,
+                  originalPrice: offerData.originalPrice,
+                  originalCurrency: offerData.originalCurrency,
+                  currency: offerData.currency || 'INR',
+                  availability: offerData.availability || 'in_stock',
+                  isSample: true,
+                  dataStatus: 'sample',
+                  lastStatus: 'ok',
+                  lastSuccessAt: new Date(),
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+              );
+
+              item.id = persistedProduct._id.toString();
+              item.offers = [toOfferSummary(persistedOffer)];
+            }
+          } catch (persistErr) {
+            console.warn('[search] Failed to persist mock.shop item:', persistErr.message);
+          }
+        }
         combined = combined.concat(mockRes.products);
       }
     } catch (err) {
@@ -259,6 +447,22 @@ export const getProviderStatus = asyncHandler(async (req, res) => {
       status: process.env.EBAY_CLIENT_ID ? 'configured' : 'unconfigured',
       description: 'Official eBay Marketplace Browse API (OAuth 2.0 client credentials required).',
       requiresAuth: true,
+    },
+    {
+      id: 'apify',
+      name: 'Apify Data Platform (Amazon, Flipkart, Meesho)',
+      type: 'live',
+      status: apifyProvider.getApifyConfig().isConfigured ? 'active' : 'unconfigured',
+      description: 'Primary cloud data extraction platform retrieving genuine live e-commerce listings.',
+      requiresAuth: true,
+    },
+    {
+      id: 'scrapling',
+      name: 'Scrapling Worker (Testbed)',
+      type: 'live',
+      status: 'active',
+      description: 'Isolated Python Scrapling worker for authorized domain extraction with SSRF protection.',
+      requiresAuth: false,
     },
   ];
 

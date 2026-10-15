@@ -8,6 +8,8 @@ import * as flipkartProvider from './flipkart.js';
 import * as amazonProvider from './amazon.js';
 import * as dummyjsonProvider from './dummyjson.js';
 import * as mockshopProvider from './mockshop.js';
+import * as scraplingProvider from './scrapling.js';
+import * as apifyProvider from './apify.js';
 
 /**
  * Dispatches an offer fetch to the configured provider.
@@ -17,10 +19,14 @@ import * as mockshopProvider from './mockshop.js';
 export async function fetchOffer(offer) {
   let result;
 
-  if (offer.provider === 'dummyjson') {
+  if (offer.provider === 'apify') {
+    result = await apifyProvider.fetchOffer(offer);
+  } else if (offer.provider === 'dummyjson') {
     result = await dummyjsonProvider.fetchOffer(offer);
   } else if (offer.provider === 'mockshop') {
     result = await mockshopProvider.fetchOffer(offer);
+  } else if (offer.provider === 'scrapling') {
+    result = await scraplingProvider.fetchOffer(offer);
   } else if (offer.isSample) {
     // Every sample offer goes to the fixture provider, regardless of whether
     // its provider label is "flipkart" or "amazon". We do NOT use provider-based

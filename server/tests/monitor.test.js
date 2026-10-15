@@ -70,4 +70,25 @@ describe('Monitor Controller & Routes API (Document 1 Section 6.6)', () => {
       });
     });
   });
+
+  describe('POST /api/monitor/trigger', () => {
+    it('should reject unauthenticated request with 401 AUTH_REQUIRED', async () => {
+      const res = await request(app).post('/api/monitor/trigger');
+      expect(res.statusCode).toBe(401);
+      expect(res.body.error).toHaveProperty('code', 'AUTH_REQUIRED');
+    });
+
+    it('should allow authenticated user to trigger on-demand monitor cycle', async () => {
+      const token = jwt.sign({ sub: '507f1f77bcf86cd799439011' }, JWT_SECRET, { expiresIn: '1h' });
+      const res = await request(app)
+        .post('/api/monitor/trigger')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body.data).toHaveProperty('offersChecked');
+      expect(res.body.data).toHaveProperty('triggeredAlerts');
+      expect(res.body.data).toHaveProperty('completedAt');
+    });
+  });
 });

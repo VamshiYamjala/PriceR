@@ -10,6 +10,7 @@ export default function SearchPage() {
   const queryParam = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category') || '';
   const providerParam = searchParams.get('provider') || 'all';
+  const retailerParam = searchParams.get('retailer') || 'amazon';
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [products, setProducts] = useState([]);
@@ -17,6 +18,7 @@ export default function SearchPage() {
   const [status, setStatus] = useState('idle'); // idle | loading | success | empty | error
   const [sortBy, setSortBy] = useState('relevance'); // relevance | price_asc | price_desc
   const [dataFilter, setDataFilter] = useState(providerParam); // all | live | sample
+  const [retailer, setRetailer] = useState(retailerParam);
 
   // Load category list on mount
   useEffect(() => {
@@ -27,13 +29,14 @@ export default function SearchPage() {
       .catch(() => {});
   }, []);
 
-  const runSearch = useCallback(async (q, cat, prov) => {
+  const runSearch = useCallback(async (q, cat, prov, ret) => {
     setStatus('loading');
     try {
       const data = await api.searchProducts({
         q,
         category: cat || undefined,
         provider: prov !== 'all' ? prov : undefined,
+        retailer: prov === 'live' ? ret : undefined,
       });
       const results = data?.products || [];
       setProducts(results);
@@ -46,8 +49,9 @@ export default function SearchPage() {
   useEffect(() => {
     setInputValue(queryParam);
     setDataFilter(providerParam);
-    runSearch(queryParam, categoryParam, providerParam);
-  }, [queryParam, categoryParam, providerParam, runSearch]);
+    setRetailer(retailerParam);
+    runSearch(queryParam, categoryParam, providerParam, retailerParam);
+  }, [queryParam, categoryParam, providerParam, retailerParam, runSearch]);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -55,6 +59,7 @@ export default function SearchPage() {
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (categoryParam) newParams.category = categoryParam;
     if (dataFilter !== 'all') newParams.provider = dataFilter;
+    if (dataFilter === 'live') newParams.retailer = retailer;
     setSearchParams(newParams);
   }
 
@@ -63,6 +68,7 @@ export default function SearchPage() {
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (newCat && newCat !== 'all') newParams.category = newCat;
     if (dataFilter !== 'all') newParams.provider = dataFilter;
+    if (dataFilter === 'live') newParams.retailer = retailer;
     setSearchParams(newParams);
   }
 
@@ -72,6 +78,17 @@ export default function SearchPage() {
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (categoryParam) newParams.category = categoryParam;
     if (filter !== 'all') newParams.provider = filter;
+    if (filter === 'live') newParams.retailer = retailer;
+    setSearchParams(newParams);
+  }
+
+  function handleRetailerChange(newRet) {
+    setRetailer(newRet);
+    const newParams = {};
+    if (inputValue.trim()) newParams.q = inputValue.trim();
+    if (categoryParam) newParams.category = categoryParam;
+    if (dataFilter !== 'all') newParams.provider = dataFilter;
+    newParams.retailer = newRet;
     setSearchParams(newParams);
   }
 
@@ -146,9 +163,22 @@ export default function SearchPage() {
                 className={`btn ${dataFilter === 'live' ? 'btn-dark' : 'btn-outline-secondary'}`}
                 onClick={() => handleFilterChange('live')}
               >
-                Verified Live
+                ● Verified Live (Apify)
               </button>
             </div>
+
+            {dataFilter === 'live' && (
+              <select
+                className="form-select form-select-sm w-auto"
+                value={retailer}
+                onChange={(e) => handleRetailerChange(e.target.value)}
+                title="Select live retail marketplace"
+              >
+                <option value="amazon">Amazon India</option>
+                <option value="flipkart">Flipkart</option>
+                <option value="meesho">Meesho</option>
+              </select>
+            )}
 
             {categories.length > 0 && (
               <select
@@ -207,6 +237,12 @@ export default function SearchPage() {
           <p className="text-muted small mb-3">
             We couldn&apos;t find any products matching your query and active filters.
           </p>
+          {dataFilter === 'live' && (
+            <div className="alert alert-light border small text-start mx-auto mb-3" style={{ maxWidth: '520px' }}>
+              <div className="fw-semibold text-primary mb-1">ℹ️ Live Retailer Search (Apify)</div>
+              <div>Live search requires <code>APIFY_API_TOKEN</code> configured in <code>server/.env</code>. If unconfigured or the retailer returns no results, switch to <strong>All Sources</strong> or <strong>Sample Catalogs</strong> to explore demonstration products.</div>
+            </div>
+          )}
           <div className="d-flex justify-content-center gap-2">
             <button
               className="btn btn-outline-secondary btn-sm"

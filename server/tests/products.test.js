@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
@@ -7,6 +8,7 @@ const hasDb = Boolean(process.env.MONGODB_URI);
 
 describe('Products & Search API (Connected Database)', () => {
   beforeAll(async () => {
+    jest.setTimeout(25000);
     if (!hasDb) return;
     if (mongoose.connection.readyState === 0) {
       await connectDB();

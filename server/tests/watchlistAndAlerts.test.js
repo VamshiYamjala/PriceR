@@ -196,5 +196,46 @@ describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 
       expect(res.statusCode).toBe(200);
       expect(res.body.data).toEqual({ deleted: true });
     });
+
+    it('Immediate Evaluation: target_price alert at or above current price triggers immediately and disarms', async () => {
+      const offer = await Offer.findById(testOfferId);
+      const res = await request(app)
+        .post('/api/alerts')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          offerId: testOfferId,
+          type: 'target_price',
+          targetPriceInPaise: (offer.priceInPaise || 100000) + 10000, // target >= current
+          channels: ['email'],
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.triggeredImmediately).toBe(true);
+      expect(res.body.data.alert.armed).toBe(false);
+
+      // Clean up
+      await Alert.findByIdAndDelete(res.body.data.alert.id);
+    });
+
+    it('Fixed-Drop Baseline: fixed_drop alert does NOT trigger on creation and remains armed', async () => {
+      const res = await request(app)
+        .post('/api/alerts')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          offerId: testOfferId,
+          type: 'fixed_drop',
+          dropAmountInPaise: 50000,
+          channels: ['email'],
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.triggeredImmediately).toBe(false);
+      expect(res.body.data.alert.armed).toBe(true);
+
+      // Clean up
+      await Alert.findByIdAndDelete(res.body.data.alert.id);
+    });
   });
 });

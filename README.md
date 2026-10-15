@@ -95,12 +95,14 @@ PriceRadar features a modular multi-provider architecture designed to provide ri
 
 | Provider | Type | Status | API Budget | Purpose |
 |---|---|---|---|---|
-| **DummyJSON** | REST Catalog | **Active** | ₹0 (Free) | Primary free sample catalog for product discovery, categories, and exploratory search with automated USD $\to$ INR conversion. |
-| **Fixture Dataset** | Static JSON | **Active** | ₹0 (Local) | Deterministic test fixtures for automated testing, multi-retailer price comparison, and predictable price-drop simulation. |
-| **mock.shop** | GraphQL | **Active (Optional)** | ₹0 (Free) | Shopify headless mock storefront for apparel and merchandise exploration. |
-| **Flipkart Affiliate API** | Retailer Feed | **Standby** | ₹0 (Partner Approval) | Official retailer adapter; safely routed to fixture fallback until partner verification is complete. |
-| **Amazon India** | Retailer | **Mock-Only** | Compliance Policy | Anti-scraping policy compliance; non-sample requests are strictly rejected. |
-| **eBay Browse API** | REST API | **Ready (Unconfigured)** | ₹0 (Free Tier) | Genuine marketplace provider adapter using OAuth 2.0 Client Credentials; safely remains dormant until credentials are provided. |
+| **Amazon India (Apify)** | Live Cloud Actor | **LIVE VERIFIED** | Apify Free Tier | Primary genuine live e-commerce search via `junglee/free-amazon-product-scraper` with automated single-listing URL refresh. |
+| **Flipkart (Apify)** | Live Cloud Actor | **LIVE VERIFIED** | Apify Free Tier | Genuine live e-commerce search and targeted listing refresh via `shahidirfan/Flipkart-Product-Scraper`. |
+| **Meesho (Apify)** | Live Cloud Actor | **LIVE IMPLEMENTED, NOT VERIFIED** | Apify Free Tier | Implemented via `scrapeai/meesho-product-scraper`; awaiting one-click permission approval in user Apify console. |
+| **DummyJSON** | REST Catalog | **SAMPLE** | ₹0 (Free) | Free sample catalog for exploratory discovery, categories, and test search with automated USD $\to$ INR conversion. |
+| **Fixture Dataset** | Static JSON | **SAMPLE** | ₹0 (Local) | Deterministic test fixtures for unit testing, multi-retailer price comparison, and price-drop simulation. |
+| **mock.shop** | GraphQL | **SAMPLE** | ₹0 (Free) | Shopify headless mock storefront for apparel and merchandise exploration. |
+| **eBay Browse API** | REST API | **UNCONFIGURED** | ₹0 (Free Tier) | Genuine marketplace provider adapter using OAuth 2.0 Client Credentials; safely remains dormant until credentials are provided. |
+| **Scrapling Worker** | Python Service | **LIVE VERIFIED (Testbed)** | ₹0 (Local) | Isolated Python data collection worker for permitted domain extraction with strict SSRF protection. |
 
 ### Data Model Separation
 1. **Canonical Product:** Normalized identity (`title`, `brand`, `model`, `variant`, `category`, `imageUrl`, `canonicalKey`, `sourceProvider`, `dataStatus`).
@@ -112,6 +114,7 @@ PriceRadar features a modular multi-provider architecture designed to provide ri
 - **Clear Badging:** Every offer and product is distinctly labeled (`Live Retailer` vs `Sample Data`).
 - **No False Market Savings:** `calculateGenuineSavings` strictly prohibits claiming real market savings from sample data or cross-currency comparisons.
 - **Monitoring Safety:** External sample catalog items are excluded from live price monitoring; fixture demo alerts are clearly marked `[PriceRadar Demo Alert]`.
+- **Targeted Single-Item Refresh:** Scheduled monitoring executes targeted URL fetches (`maxItems: 1`) to eliminate wasteful multi-page scraping.
 
 ---
 
@@ -245,11 +248,19 @@ PriceRadar/
 | `CLIENT_ORIGIN` | Yes | Allowed frontend origin for CORS | `http://localhost:5173` |
 | `FLIPKART_AFFILIATE_ID` | No | Affiliate ID (blank until approved) | `your_affiliate_id` |
 | `FLIPKART_AFFILIATE_TOKEN` | No | Affiliate Token (blank until approved) | `your_affiliate_token` |
-| `BREVO_API_KEY` | Yes | Brevo Transactional Email API key | `xkeysib-...` |
+| `BREVO_API_KEY` | Yes | Brevo Transactional Email API key (starts with `xkeysib-`) | `xkeysib-...` |
 | `EMAIL_FROM` | Yes | Verified sender email address | `alerts@yourdomain.example` |
+| `EMAIL_FROM_NAME` | No | Sender display name | `PriceRadar` |
 | `TELEGRAM_BOT_TOKEN` | Yes | Telegram Bot Token from @BotFather | `123456789:ABCDefgh...` |
+| `TELEGRAM_BOT_USERNAME` | No | Telegram Bot username | `PriceRadar_Alerts_Bot` |
 | `MONITOR_TRIGGER_SECRET` | Yes | Header secret for `POST /api/monitor/run` | `random-32-byte-hex-string` |
 | `MONITORING_ENABLED` | Yes | Enable/disable monitoring cycles | `true` |
+| `APIFY_API_TOKEN` | Yes | Apify Personal API Token | `apify_api_...` |
+| `APIFY_ACTOR_AMAZON` | No | Apify Amazon India Actor ID | `junglee/free-amazon-product-scraper` |
+| `APIFY_ACTOR_FLIPKART` | No | Apify Flipkart Actor ID | `shahidirfan/Flipkart-Product-Scraper` |
+| `APIFY_ACTOR_MEESHO` | No | Apify Meesho Actor ID | `scrapeai/meesho-product-scraper` |
+| `APIFY_MAX_ITEMS` | No | Maximum items per search | `5` |
+| `APIFY_TIMEOUT_SECS` | No | Actor execution timeout in seconds | `60` |
 
 ### Frontend (`client/.env`)
 | Variable | Required | Description | Example |

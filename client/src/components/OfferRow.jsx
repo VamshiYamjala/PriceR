@@ -3,8 +3,20 @@ import { Link } from 'react-router-dom';
 import * as api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-function formatProviderName(provider) {
+function formatProviderName(offer) {
+  if (!offer) return 'Retailer';
+  const provider = typeof offer === 'string' ? offer : offer.provider;
   if (!provider) return 'Retailer';
+
+  if (provider === 'apify') {
+    const extId = (typeof offer === 'object' ? offer.externalProductId || '' : '').toLowerCase();
+    const url = (typeof offer === 'object' ? offer.productUrl || '' : '').toLowerCase();
+    if (extId.startsWith('amazon') || url.includes('amazon')) return 'Amazon India (Live)';
+    if (extId.startsWith('flipkart') || url.includes('flipkart')) return 'Flipkart (Live)';
+    if (extId.startsWith('meesho') || url.includes('meesho')) return 'Meesho (Live)';
+    return 'Apify Live Retailer';
+  }
+
   const map = {
     amazon: 'Amazon India',
     flipkart: 'Flipkart',
@@ -12,6 +24,7 @@ function formatProviderName(provider) {
     mockshop: 'mock.shop Storefront',
     ebay: 'eBay Marketplace',
     fixture: 'Fixture Dataset',
+    scrapling: 'Scrapling Worker',
   };
   return map[provider.toLowerCase()] || provider;
 }
@@ -27,11 +40,8 @@ export default function OfferRow({ offer, isLowest }) {
     maximumFractionDigits: 0,
   });
 
-  const isTrackedOffer =
-    offer.id &&
-    !offer.id.startsWith('dummyjson-') &&
-    !offer.id.startsWith('mockshop-') &&
-    !offer.id.startsWith('ebay-');
+  // Any offer with an id (including persisted DummyJSON, Scrapling, eBay, etc.) can be tracked
+  const isTrackedOffer = Boolean(offer.id || offer._id);
 
   async function handleAddToWatchlist(e) {
     e.stopPropagation();
@@ -59,7 +69,7 @@ export default function OfferRow({ offer, isLowest }) {
       <div>
         <div className="d-flex align-items-center gap-2 mb-1">
           <span className="fw-semibold text-secondary small">
-            {formatProviderName(offer.provider)}
+            {formatProviderName(offer)}
           </span>
           {isSample ? (
             <span className="badge badge-sample small" title="Simulated demonstration data">
@@ -128,7 +138,7 @@ export default function OfferRow({ offer, isLowest }) {
             className="btn btn-primary btn-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            View on {formatProviderName(offer.provider).split(' ')[0]} ↗
+            View on {formatProviderName(offer).split(' ')[0]} ↗
           </a>
         )}
       </div>

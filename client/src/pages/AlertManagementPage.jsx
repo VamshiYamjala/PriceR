@@ -5,20 +5,43 @@ import * as api from '../services/api';
 export default function AlertManagementPage() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState(null);
+
+  async function loadAlerts() {
+    try {
+      const data = await api.getAlerts();
+      setAlerts(data?.alerts || []);
+    } catch (err) {
+      console.error('Failed to load alerts:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadAlerts() {
-      try {
-        const data = await api.getAlerts();
-        setAlerts(data?.alerts || []);
-      } catch (err) {
-        console.error('Failed to load alerts:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadAlerts();
   }, []);
+
+  async function handleRefreshNow() {
+    setRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const res = await api.triggerPriceRefresh();
+      setRefreshResult({
+        success: true,
+        message: `Evaluation complete! Checked ${res.offersChecked || 0} offers, triggered ${res.triggeredAlerts || 0} alert notification(s).`,
+      });
+      await loadAlerts();
+    } catch (err) {
+      setRefreshResult({
+        success: false,
+        message: err.response?.data?.error?.message || 'Price evaluation cycle encountered an error.',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function handleToggleStatus(alert) {
     const nextStatus = alert.status === 'active' ? 'paused' : 'active';
@@ -44,12 +67,54 @@ export default function AlertManagementPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h4 mb-0">Manage Price Alerts</h1>
-        <Link to="/watchlist" className="btn btn-outline-primary btn-sm">
-          + New Alert from Watchlist
-        </Link>
+      <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-4">
+        <div>
+          <h1 className="h4 mb-1">Manage Price Alerts</h1>
+          <p className="text-muted small mb-0">
+            Rules are evaluated immediately upon creation and during the 4-hour background cycle.
+          </p>
+        </div>
+        <div className="d-flex gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+            onClick={handleRefreshNow}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <>
+                <span className="spinner-border spinner-border-sm" role="status" />
+                <span>Checking Prices...</span>
+              </>
+            ) : (
+              <>
+                <span>🔄</span>
+                <span>Refresh & Check Now</span>
+              </>
+            )}
+          </button>
+          <Link to="/watchlist" className="btn btn-primary btn-sm">
+            + New Alert
+          </Link>
+        </div>
       </div>
+
+      {refreshResult && (
+        <div
+          className={`alert ${
+            refreshResult.success ? 'alert-success' : 'alert-danger'
+          } alert-dismissible fade show py-2 small mb-3`}
+          role="alert"
+        >
+          {refreshResult.message}
+          <button
+            type="button"
+            className="btn-close py-2"
+            aria-label="Close"
+            onClick={() => setRefreshResult(null)}
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-4">

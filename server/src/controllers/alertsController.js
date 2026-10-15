@@ -1,12 +1,26 @@
 // server/src/controllers/alertsController.js
 import Alert from '../models/Alert.js';
 import Offer from '../models/Offer.js';
+import User from '../models/User.js';
+import { evaluateAlert } from '../services/alertEvaluator.js';
+import { dispatchAlertNotifications } from '../services/alertDispatcher.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function toPublicAlert(alert) {
+  const isPopulated = alert.offerId && typeof alert.offerId === 'object' && alert.offerId.title;
   return {
     id: alert._id.toString(),
-    offerId: alert.offerId.toString(),
+    offerId: isPopulated ? alert.offerId._id.toString() : alert.offerId.toString(),
+    offer: isPopulated
+      ? {
+          id: alert.offerId._id.toString(),
+          title: alert.offerId.title,
+          priceInPaise: alert.offerId.priceInPaise,
+          provider: alert.offerId.provider,
+          productUrl: alert.offerId.productUrl,
+          imageUrl: alert.offerId.imageUrl,
+        }
+      : undefined,
     type: alert.type,
     targetPriceInPaise: alert.targetPriceInPaise ?? null,
     dropAmountInPaise: alert.dropAmountInPaise ?? null,
@@ -19,7 +33,7 @@ function toPublicAlert(alert) {
 }
 
 export const listAlerts = asyncHandler(async (req, res) => {
-  const alerts = await Alert.find({ userId: req.user.id }).sort({ createdAt: -1 });
+  const alerts = await Alert.find({ userId: req.user.id }).populate('offerId').sort({ createdAt: -1 });
   return res.status(200).json({
     success: true,
     data: { alerts: alerts.map(toPublicAlert) },
@@ -44,11 +58,35 @@ export const createAlert = asyncHandler(async (req, res) => {
     targetPriceInPaise: type === 'target_price' ? targetPriceInPaise : undefined,
     dropAmountInPaise: type === 'fixed_drop' ? dropAmountInPaise : undefined,
     channels,
+    status: 'active',
+    armed: true,
   });
+
+  let triggeredImmediately = false;
+
+  // Immediate evaluation for target_price alerts:
+  // If the offer already satisfies the target condition (e.g. currentPrice <= targetPrice),
+  // dispatch notification immediately and disarm the alert so the user is instantly notified.
+  // Fixed-drop alerts establish baseline upon creation and do NOT trigger until a subsequent drop.
+  if (type === 'target_price' && typeof offer.priceInPaise === 'number' && offer.priceInPaise > 0) {
+    const evalResult = evaluateAlert(alert, offer.priceInPaise, null);
+    if (evalResult.shouldNotify) {
+      triggeredImmediately = true;
+      alert.armed = false;
+      alert.lastTriggeredAt = new Date();
+      await alert.save();
+
+      const user = await User.findById(req.user.id);
+      await dispatchAlertNotifications({ alert, offer, user, evalResult });
+    }
+  }
 
   return res.status(201).json({
     success: true,
-    data: { alert: toPublicAlert(alert) },
+    data: {
+      alert: toPublicAlert(alert),
+      triggeredImmediately,
+    },
   });
 });
 

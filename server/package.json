@@ -10,7 +10,13 @@
     "seed:fixtures": "node src/jobs/seedFixtures.js",
     "db:verify": "node src/jobs/verifyDbConnection.js",
     "db:migrate": "node src/jobs/migrateDataStatus.js",
-    "monitor:run": "node src/jobs/runMonitorLocally.js"
+    "monitor:run": "node src/jobs/runMonitorLocally.js",
+    "email:verify": "node src/jobs/verifyEmailConfig.js",
+    "email:test": "node src/jobs/verifyEmailConfig.js --send-test",
+    "telegram:verify": "node src/jobs/verifyTelegramConfig.js",
+    "telegram:test": "node src/jobs/verifyTelegramConfig.js --send-test",
+    "apify:verify": "node src/jobs/verifyApifyConfig.js",
+    "apify:test": "node src/jobs/verifyApifyConfig.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

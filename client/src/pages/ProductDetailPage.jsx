@@ -23,14 +23,8 @@ export default function ProductDetailPage() {
         setProduct(prod);
         setOffers(offerList);
 
-        // Load price history for the first tracked offer
-        const tracked = offerList.find(
-          (o) =>
-            o.id &&
-            !o.id.startsWith('dummyjson-') &&
-            !o.id.startsWith('mockshop-') &&
-            !o.id.startsWith('ebay-')
-        );
+        // Load price history for the first available offer with an id
+        const tracked = offerList.find((o) => o.id || o._id);
         if (tracked) {
           setActiveHistoryOffer(tracked.id);
           try {
@@ -206,44 +200,126 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Genuine Stored Observations History */}
+          {/* Genuine Stored Observations History with Trend Chart */}
           {activeHistoryOffer && (
             <div className="mt-4 pt-4 border-top">
-              <h3 className="h6 fw-bold mb-2">Verified Price Observation History</h3>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="h6 fw-bold mb-0">Verified Price Observation History & Trend</h3>
+                <span className="badge bg-light text-muted border small">
+                  {activeHistory ? activeHistory.length : 0} observation(s)
+                </span>
+              </div>
+
               {activeHistory && activeHistory.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="table table-sm table-bordered small align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Observation Timestamp</th>
-                        <th>Observed Price</th>
-                        <th>Fetch Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeHistory.slice(0, 5).map((h, idx) => (
-                        <tr key={idx}>
-                          <td>{new Date(h.fetchedAt).toLocaleString('en-IN')}</td>
-                          <td className="fw-semibold">
-                            {h.priceInPaise
-                              ? `₹${(h.priceInPaise / 100).toLocaleString('en-IN')}`
-                              : '—'}
-                          </td>
-                          <td>
-                            <span
-                              className={`badge ${
-                                h.status === 'success'
-                                  ? 'bg-success-subtle text-success'
-                                  : 'bg-danger-subtle text-danger'
-                              }`}
-                            >
-                              {h.status}
-                            </span>
-                          </td>
+                <div>
+                  {/* Min / Max Summary Stats */}
+                  {(() => {
+                    const validPrices = activeHistory
+                      .filter((h) => h.status === 'success' && typeof h.priceInPaise === 'number')
+                      .map((h) => h.priceInPaise);
+
+                    if (validPrices.length === 0) return null;
+                    const minPrice = Math.min(...validPrices);
+                    const maxPrice = Math.max(...validPrices);
+                    const latestPrice = validPrices[0];
+
+                    return (
+                      <div className="row g-2 mb-3">
+                        <div className="col-sm-4">
+                          <div className="p-2 border rounded bg-light text-center">
+                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Lowest Observed</span>
+                            <span className="fw-bold text-success small">₹{(minPrice / 100).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                        <div className="col-sm-4">
+                          <div className="p-2 border rounded bg-light text-center">
+                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Highest Observed</span>
+                            <span className="fw-bold text-dark small">₹{(maxPrice / 100).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                        <div className="col-sm-4">
+                          <div className="p-2 border rounded bg-light text-center">
+                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Latest Recorded</span>
+                            <span className="fw-bold text-primary small">₹{(latestPrice / 100).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Lightweight SVG Price Trend Sparkline */}
+                  {(() => {
+                    const points = activeHistory
+                      .filter((h) => h.status === 'success' && typeof h.priceInPaise === 'number')
+                      .slice(0, 10)
+                      .reverse();
+
+                    if (points.length < 2) return null;
+                    const prices = points.map((p) => p.priceInPaise);
+                    const min = Math.min(...prices);
+                    const max = Math.max(...prices);
+                    const range = max - min || 1;
+                    const width = 500;
+                    const height = 80;
+                    const padding = 15;
+
+                    const coords = points.map((p, idx) => {
+                      const x = padding + (idx / (points.length - 1)) * (width - padding * 2);
+                      const y = height - padding - ((p.priceInPaise - min) / range) * (height - padding * 2);
+                      return `${x},${y}`;
+                    }).join(' ');
+
+                    return (
+                      <div className="p-3 bg-light rounded border mb-3">
+                        <span className="text-muted small fw-semibold d-block mb-2">Price Trend Line (Paise):</span>
+                        <svg viewBox={`0 0 ${width} ${height}`} className="w-100" style={{ maxHeight: '90px' }}>
+                          <polyline
+                            fill="none"
+                            stroke="#0F6E56"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            points={coords}
+                          />
+                        </svg>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="table-responsive">
+                    <table className="table table-sm table-bordered small align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Observation Timestamp</th>
+                          <th>Observed Price</th>
+                          <th>Fetch Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {activeHistory.slice(0, 8).map((h, idx) => (
+                          <tr key={idx}>
+                            <td>{new Date(h.fetchedAt).toLocaleString('en-IN')}</td>
+                            <td className="fw-semibold">
+                              {h.priceInPaise
+                                ? `₹${(h.priceInPaise / 100).toLocaleString('en-IN')}`
+                                : '—'}
+                            </td>
+                            <td>
+                              <span
+                                className={`badge ${
+                                  h.status === 'success'
+                                    ? 'bg-success-subtle text-success'
+                                    : 'bg-danger-subtle text-danger'
+                                }`}
+                              >
+                                {h.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <p className="text-muted small mb-0">

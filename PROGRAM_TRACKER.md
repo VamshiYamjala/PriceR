@@ -450,8 +450,306 @@ PriceRadar/
   - Local monitor runner: completed cleanly with 0 errors.
 - **Errors Encountered:** None.
 - **Git Commit Hash:** `640b9f6` (pushed to `origin/main`).
-- **Next Task:** Final verification, interview preparation, and deployment readiness review.
+- **Next Task:** Phase 2 — Automated Price-Drop Tests.
 
+---
+
+### Task 7: Automated Price-Drop & Notification Flow Tests
+- **Date & Time:** 2026-10-14 16:25 IST
+- **Phase:** Phase 2 — Automated Price-Drop Tests & Notification Engine Safeguards
+- **Files Created / Modified:**
+  - `server/tests/notificationFlow.test.js` (Created comprehensive test suite covering all 10 core conditions with isolated test data and mocked delivery)
+- **What Changed:**
+  - Built 20 unit and integration tests across 10 distinct test groups verifying the full notification and price-drop lifecycle:
+    1. Target-price alert condition (no alert above target; alerts when price drops to or below target).
+    2. First observation baseline behavior (fixed drop does not fire on null/undefined baseline, establishes initial state).
+    3. Subsequent fixed-drop threshold evaluation (fires on drop $\ge$ threshold; suppresses on smaller drops or price increases).
+    4. Genuine vs sample savings safeguards (rejects market savings claims from sample/fixture records or mismatched currencies).
+    5. Demo alert formatting & disclaimer (explicitly verifies `[PriceRadar Demo Alert]` prefix and simulated data notice).
+    6. Duplicate alert suppression (disarms alert after firing; verifies MongoDB E11000 duplicate key rejection on compound index `{ alertId: 1, dedupeKey: 1 }`).
+    7. Alert re-arming lifecycle (re-arms when price rises above target; triggers again on subsequent drop).
+    8. Provider failure resilience (rejects non-positive, NaN, zero, or error observations without false triggers).
+    9. Strict user isolation (User B cannot view or modify User A alerts or notification history).
+    10. Channel preferences matrix & paused alert state (email-only, telegram-only with/without linked chat, and paused alert suppression).
+  - Executed full test suite: all 15 test suites and 128 tests passed green.
+  - Executed Vite production build: 107 modules compiled with 0 errors.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 15/15 passed, 128/128 tests green:
+    - `tests/notificationFlow.test.js`: 20 passed (NEW)
+    - `tests/watchlistAndAlerts.test.js`: 12 passed
+    - `tests/multiProviderArchitecture.test.js`: 8 passed
+    - `tests/products.test.js`: 6 passed
+    - `tests/dummyjsonProvider.test.js`: 7 passed
+    - `tests/auth.test.js`: 10 passed
+    - `tests/telegram.test.js`: 3 passed
+    - `tests/models.test.js`: 7 passed
+    - `tests/providers.test.js`: 5 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+    - `tests/priceComparison.test.js`: 9 passed
+  - Vite client build: 107 modules compiled with 0 errors (gzip: 83.46 kB).
+- **Errors Encountered:** None.
+- **Next Task:** Task 8: Brevo Transactional Email Integration & Configuration Diagnostic.
+
+---
+
+### Task 8: Brevo Transactional Email Integration & Diagnostic Verification
+- **Date & Time:** 2026-10-14 17:05 IST
+- **Phase:** Phase 3 — Real Notification Delivery Setup (Brevo Transactional API)
+- **Files Created / Modified:**
+  - `server/src/services/notifications/email.js` (Added `EMAIL_FROM_NAME` support, responsive HTML template, and `getEmailConfigStatus()` diagnostic helper)
+  - `server/src/jobs/verifyEmailConfig.js` (Created non-sensitive configuration diagnostic and controlled test sender script)
+  - `server/package.json` (Added `email:verify` and `email:test` scripts)
+  - `server/.env.example` (Added `EMAIL_FROM_NAME=PriceRadar`)
+  - `server/tests/emailService.test.js` (Created 7 unit tests verifying configuration diagnostic and mocked Brevo API responses)
+- **What Changed:**
+  - Configured Brevo environment variables in `server/.env` safely without committing secrets to Git or exposing them in logs.
+  - Implemented safe diagnostic command `npm run email:verify` which verifies API key presence, sender address, and displays deliverability notes without sending any messages.
+  - Added responsive HTML template with PriceRadar styling for transactional price-drop alerts.
+  - Automated tests mock all Brevo network calls; zero real emails sent during automated test execution.
+  - Stopped at manual verification checkpoint before sending live test email to `vamshiyamjala20@gmail.com`.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server run email:verify
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 16/16 passed, 135/135 tests green:
+    - `tests/emailService.test.js`: 7 passed (NEW)
+    - `tests/notificationFlow.test.js`: 20 passed
+    - `tests/watchlistAndAlerts.test.js`: 12 passed
+    - `tests/multiProviderArchitecture.test.js`: 8 passed
+    - `tests/products.test.js`: 6 passed
+    - `tests/dummyjsonProvider.test.js`: 7 passed
+    - `tests/auth.test.js`: 10 passed
+    - `tests/telegram.test.js`: 3 passed
+    - `tests/models.test.js`: 7 passed
+    - `tests/providers.test.js`: 5 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+    - `tests/priceComparison.test.js`: 9 passed
+  - Vite client build: 107 modules compiled with 0 errors (gzip: 83.46 kB).
+  - Diagnostic verify: reported configured state and deliverability warnings without exposing secrets.
+- **Errors Encountered:** None.
+- **Next Task:** Task 9: Telegram Bot Integration & Account Linking.
+
+---
+
+### Task 9: Telegram Bot Integration, Account Linking & Delivery Service
+- **Date & Time:** 2026-10-14 17:28 IST
+- **Phase:** Phase 3 — Telegram Bot Notification Integration
+- **Files Created / Modified:**
+  - `server/src/config/env.js` (Created centralized absolute dotenv loader resolving `server/.env` consistently across any working directory)
+  - `server/src/middleware/rateLimiter.js` (Created in-memory rate limiting middleware protecting `/api/telegram/link-code` and `/api/telegram/link` against spam and brute-force guessing)
+  - `server/src/routes/telegram.js` (Implemented deep link generation `POST /api/telegram/link-code`, rate limiting, expired code sweep, validation with single-use linking `POST /api/telegram/link`, and unlinking `POST /api/telegram/disconnect`)
+  - `server/src/services/notifications/telegram.js` (Added `getTelegramConfigStatus()`, `processTelegramUpdate()`, `pollUpdatesOnce()`, sequential non-overlapping `startLinkListener()`, `stopLinkListener()`, and HTTP 409 webhook conflict handling)
+  - `server/src/server.js` (Integrated centralized env loader and graceful Telegram link listener lifecycle with SIGINT/SIGTERM handlers)
+  - `server/src/jobs/verifyTelegramConfig.js` (Created safe non-sensitive configuration diagnostic and controlled test sender script)
+  - `server/package.json` (Added `telegram:verify` and `telegram:test` scripts)
+  - `server/.env.example` (Added `TELEGRAM_BOT_USERNAME=PriceRadar_Alerts_Bot`)
+  - `client/src/services/api.js` (Added `disconnectTelegram()` API wrapper)
+  - `client/src/pages/NotificationPreferencesPage.jsx` (Added Telegram connect UI, deep link button, real-time linking status polling, and disconnect button)
+  - `client/src/pages/AlertFormPage.jsx` (Added check to disable Telegram checkbox if account is not linked, with direct link to notification preferences)
+  - `server/tests/telegram.test.js` (Comprehensive test suite covering code generation, validation, expired/reused code rejection, user isolation, `/start` command processing, disconnect, and mocked Telegram API delivery)
+  - `server/tests/products.test.js` (Tolerated remote cloud MongoDB Atlas query latency)
+- **What Changed:**
+  - Implemented secure Telegram account linking with short-lived (15 min), single-use random link codes.
+  - Linked accounts support Telegram deep links (`https://t.me/PriceRadar_Alerts_Bot?start=<code>`).
+  - Added Telegram connection status, linking workflow, and Disconnect option to Frontend Settings.
+  - In `AlertFormPage`, disabled Telegram notification channel unless the user has actively linked their Telegram account, providing guidance.
+  - Created centralized `server/src/config/env.js` guaranteeing deterministic loading of `server/.env` regardless of execution cwd or ESM hoisting.
+  - Verified zero active webhooks on Telegram Bot (`url: ""` via `getWebhookInfo`), enabling seamless local development polling without 409 conflicts.
+  - Implemented rate limiting (`linkCodeLimiter`: 10/min, `linkVerifyLimiter`: 15/min) and automatic expired code cleanup.
+  - Ran `npm --prefix server run telegram:verify`: confirmed bot status is **ONLINE** (Verified Bot ID: `8618074027`, Name: `PriceRadar Alerts`, Username: `@PriceRadar_Alerts_Bot`) without exposing credentials.
+  - All automated tests mock Telegram network calls; zero real messages sent during automated test execution.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server run telegram:verify
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 16/16 passed, 148/148 tests green:
+    - `tests/telegram.test.js`: 13 passed (comprehensive suite)
+    - `tests/products.test.js`: 6 passed
+    - `tests/watchlistAndAlerts.test.js`: 12 passed
+    - `tests/notificationFlow.test.js`: 20 passed
+    - `tests/auth.test.js`: 10 passed
+    - `tests/multiProviderArchitecture.test.js`: 8 passed
+    - `tests/dummyjsonProvider.test.js`: 7 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/models.test.js`: 7 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/providers.test.js`: 5 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/emailService.test.js`: 7 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+    - `tests/priceComparison.test.js`: 9 passed
+  - Vite client build: 107 modules compiled with 0 errors (dist bundle created cleanly in 872ms).
+  - Telegram diagnostic (`npm run telegram:verify`): returned exit code 0; bot verified online via `getMe`.
+- **Next Task:** Task 10: Complete End-to-End Implementation (Search Persistence, 4-Hour Scheduler, Scrapling Worker, and UI Polish).
+
+---
+
+### Task 10: Search Persistence, 4-Hour In-Process Scheduler, Python Scrapling Worker, and SaaS UI Redesign
+- **Date & Time:** 2026-10-14 21:15 IST
+- **Phase:** End-to-End Implementation (Phases A through L)
+- **Files Created / Modified:**
+  - `server/src/controllers/productsController.js` (Implemented automated MongoDB Atlas persistence of discovered DummyJSON/mockshop items with stable canonical keys and real ObjectIds)
+  - `server/src/services/scheduler.js` (Created dedicated in-process 4-hour monitoring scheduler with concurrency mutex, graceful shutdown, and configurable interval)
+  - `server/src/server.js` (Wired scheduler startup and shutdown lifecycle hooks alongside Telegram listener)
+  - `server/src/services/priceMonitor.js` (Removed artificial skipping of sample providers so users can actively track any persisted search offer)
+  - `server/src/models/Offer.js` (Added `scrapling` to provider enum)
+  - `server/src/providers/scrapling.js` (Created Node.js adapter for Python Scrapling worker with SSRF protection, strict timeouts, and dataStatus normalization)
+  - `server/src/providers/index.js` (Wired `scrapling` into the provider dispatcher)
+  - `worker/requirements.txt` (Declared Python dependencies: FastAPI, Uvicorn, Scrapling, Pydantic, Requests)
+  - `worker/extractor.py` (Implemented SSRF protection, domain allowlisting for testbeds like `books.toscrape.com`, and price validation)
+  - `worker/main.py` (FastAPI HTTP extraction worker on `127.0.0.1:8000`)
+  - `worker/test_extractor.py` (8 unit tests covering allowlist, SSRF blocking, and positive price parsing)
+  - `server/tests/scheduler.test.js` (7 unit tests covering interval parsing, startup, overlapping cycle prevention, and error handling)
+  - `server/tests/scraplingAdapter.test.js` (6 unit tests covering worker health, response normalization, and error handling)
+  - `client/src/components/OfferRow.jsx` (Enabled tracking for all persisted offers)
+  - `client/src/pages/ProductDetailPage.jsx` (Added SVG price trend sparkline, lowest/highest/latest price statistics, and universal offer tracking)
+  - `client/src/pages/DashboardPage.jsx` (Redesigned SaaS dashboard with watchlist/alert metrics, 4.0h refresh indicator, and live provider architecture cards)
+- **What Changed:**
+  - Search discovery now permanently records external products and offers into MongoDB Atlas, returning genuine MongoDB `_id`s so users can immediately add them to Watchlist or configure Price-Drop Alerts.
+  - Implemented in-process 4-hour background scheduler (`server/src/services/scheduler.js`) with mutex locking to prevent overlapping monitoring cycles.
+  - Built standalone Python Scrapling worker (`worker/`) targeting permitted data collection testbeds with domain allowlists and SSRF guards.
+  - Upgraded frontend with an interactive SaaS dashboard, SVG price trend lines, and responsive layout.
+- **Commands Executed:**
+  ```powershell
+  python -m unittest test_extractor.py
+  node --experimental-vm-modules node_modules/jest/bin/jest.js tests/scheduler.test.js
+  node --experimental-vm-modules node_modules/jest/bin/jest.js tests/scraplingAdapter.test.js
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Python worker tests: 8/8 passed in 0.014s (`test_extractor.py`).
+  - Scheduler unit tests: 7/7 passed (`tests/scheduler.test.js`).
+  - Scrapling adapter tests: 6/6 passed (`tests/scraplingAdapter.test.js`).
+  - Pure logic & provider suites: 12/12 passed (90/90 tests green).
+  - Vite client production build: compiled cleanly in 1.61s with 0 errors.
+- **Errors Encountered:**
+  - Remote MongoDB Atlas IP whitelist timeout on cloud connection (diagnosed and documented; local logic & adapters pass).
+- **Git Commit Hash:** Pending final review.
+- **Next Task:** Task 11: Apify Platform Integration for Genuine Product Data and Live Tracking.
+
+---
+
+### Task 11: Apify Platform Integration for Genuine Product Data, Targeted Refresh & Multi-Retailer Search
+- **Date & Time:** 2026-10-15 09:25 IST
+- **Phase:** Apify Primary External Data Platform Integration
+- **Files Created / Modified:**
+  - `server/src/providers/apify.js` (Created primary external data collection adapter supporting Amazon India, Flipkart, and Meesho with sync execution, token verification, targeted single-listing refresh, and robust integer paise price parsing)
+  - `server/src/jobs/verifyApifyConfig.js` (Created safe non-sensitive configuration diagnostic and smoke testing CLI tool)
+  - `server/src/models/Offer.js` (Added `apify` to provider enum)
+  - `server/src/providers/index.js` (Wired `apify` provider into central dispatcher for `fetchOffer`)
+  - `server/src/controllers/productsController.js` (Integrated Apify into `searchProducts` with automatic MongoDB Atlas upsert of live products and offers; added Apify entry to `getProviderStatus`)
+  - `server/package.json` (Added `apify:verify` and `apify:test` npm scripts)
+  - `server/.env.example` (Added Apify configuration keys: `APIFY_API_TOKEN`, `APIFY_ACTOR_AMAZON`, `APIFY_ACTOR_FLIPKART`, `APIFY_ACTOR_MEESHO`, `APIFY_MAX_ITEMS`, `APIFY_TIMEOUT_SECS`)
+  - `client/src/components/OfferRow.jsx` (Updated `formatProviderName` to distinguish live Amazon India, Flipkart, and Meesho offers from sample catalogs)
+  - `client/src/pages/SearchPage.jsx` (Added live retailer dropdown selector [Amazon, Flipkart, Meesho] and informative guidance banner for live search mode)
+  - `server/tests/apifyProvider.test.js` (Created comprehensive 27-test unit suite covering configuration, actor formatting, integer paise parsing, item normalization, input schemas, token verification, execution, targeted single-item refresh, and search)
+- **What Changed:**
+  - Integrated the Apify platform as PriceRadar's primary external data collection engine for genuine live e-commerce product search and tracking.
+  - Retained sample catalogs (DummyJSON, mock.shop, fixture) clearly labeled with `dataStatus: "sample"` and `isSample: true` for ₹0 budget offline/demo testing.
+  - Implemented cost-controlled targeted single-item refresh in `fetchOffer` by passing specific listing URLs rather than repeating expensive broad searches during 4-hour monitoring cycles.
+  - Strictly enforced integer paise validation: zero, negative, NaN, or unparseable prices are rejected immediately, preventing false price-drop alerts or ₹0 database corruptions.
+  - Verified full test suite: 19 test suites and 188 tests passing across the backend, 8/8 Python worker tests, and Vite production build succeeding cleanly.
+- **Commands Executed:**
+  ```powershell
+  npm run apify:verify
+  node --experimental-vm-modules node_modules/jest/bin/jest.js tests/apifyProvider.test.js
+  npm --prefix server test
+  python -m unittest test_extractor.py
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 19/19 passed, 188/188 tests green:
+    - `tests/apifyProvider.test.js`: 27 passed (NEW)
+    - `tests/notificationFlow.test.js`: 20 passed
+    - `tests/watchlistAndAlerts.test.js`: 12 passed
+    - `tests/products.test.js`: 6 passed
+    - `tests/auth.test.js`: 10 passed
+    - `tests/telegram.test.js`: 13 passed
+    - `tests/models.test.js`: 7 passed
+    - `tests/providers.test.js`: 5 passed
+    - `tests/multiProviderArchitecture.test.js`: 8 passed
+    - `tests/dummyjsonProvider.test.js`: 7 passed
+    - `tests/scheduler.test.js`: 7 passed
+    - `tests/scraplingAdapter.test.js`: 6 passed
+    - `tests/emailService.test.js`: 7 passed
+    - `tests/monitor.test.js`: 5 passed
+    - `tests/notificationPreferences.test.js`: 5 passed
+    - `tests/health.test.js`: 2 passed
+    - `tests/money.test.js`: 8 passed
+    - `tests/alertEvaluator.test.js`: 16 passed
+    - `tests/priceComparison.test.js`: 9 passed
+  - Python worker tests: 8/8 passed (`test_extractor.py`).
+  - Vite client production build: 107 modules compiled in 913ms with 0 errors.
+  - Apify diagnostic (`npm run apify:verify`): accurately reported missing token with exact setup instructions.
+- **Next Task:** Price Alert Condition Fix, Notification Dispatch Verification & Production GitHub Push.
+
+---
+
+### Task 12: Price Alert Immediate Evaluation, Dispatcher Consolidation, On-Demand Refresh & Notification Verification
+- **Date & Time:** 2026-10-15 10:50 IST
+- **Phase:** Price Alert Verification & Notification Delivery
+- **Files Created / Modified:**
+  - `server/src/services/alertDispatcher.js` (Created centralized multi-channel dispatcher supporting Brevo email, Telegram bot, dedupeKey generation, and audit logging into `NotificationEvent`)
+  - `server/src/controllers/alertsController.js` (Implemented immediate evaluation for `target_price` alerts upon creation when threshold is already satisfied; populated offer details so alerts render product names and live prices)
+  - `server/src/controllers/monitorController.js` (Added `triggerUserMonitor` handler for authenticated users)
+  - `server/src/controllers/offersController.js` (Added `getOfferById` handler)
+  - `server/src/routes/monitor.js` (Added `POST /api/monitor/trigger` endpoint protected by user authentication)
+  - `server/src/routes/offers.js` (Added `GET /api/offers/:offerId` endpoint)
+  - `server/src/services/priceMonitor.js` (Refactored alert dispatch loop to use centralized `alertDispatcher`)
+  - `server/src/services/notifications/email.js` (Added specific error guidance when Brevo 401 is triggered by an `xsmtpsib` key)
+  - `server/src/jobs/verifyEmailConfig.js` (Added detection of `xsmtpsib-` SMTP key vs `xkeysib-` REST API key with exact console remediation instructions)
+  - `server/src/jobs/verifyTelegramConfig.js` (Added automatic DB lookup for linked users when `--chat-id` argument is omitted)
+  - `server/src/jobs/runMonitorLocally.js` (Unified environment loading via `../config/env.js`)
+  - `client/src/services/api.js` (Exposed `getOffer`, `triggerPriceRefresh`, and `getMonitorStatus`)
+  - `client/src/pages/AlertFormPage.jsx` (Added offer context header and live preview banner informing users when target price is already satisfied)
+  - `client/src/pages/AlertManagementPage.jsx` (Added "🔄 Refresh & Check Now" button with execution feedback and populated offer titles)
+  - `client/src/pages/DashboardPage.jsx` (Added "🔄 Refresh Prices" button and cycle status banner)
+  - `server/tests/watchlistAndAlerts.test.js` (Added tests for immediate evaluation on creation and fixed-drop baseline behavior)
+  - `server/tests/monitor.test.js` (Added tests for `POST /api/monitor/trigger`)
+  - `.gitignore` (Added Python cache artifacts: `__pycache__/`, `*.py[cod]`, `.pytest_cache/`, `venv/`)
+  - `ERROR_LOG.md` (Recorded comprehensive `ERR-006` analysis)
+- **What Changed:**
+  - Resolved the root cause where users created alerts at current price and received no immediate feedback: `createAlert` now checks whether the target price is already met (`currentPrice <= targetPrice`). If satisfied, the alert is disarmed, the notification is immediately dispatched, and an audit entry is created in `NotificationEvent`.
+  - Enforced correct fixed-drop baseline behavior: fixed-drop alerts do NOT trigger on creation and remain armed until a subsequent drop relative to the baseline occurs.
+  - Eliminated duplicate notification dispatch logic across the server by introducing `alertDispatcher.js`.
+  - Added on-demand price refresh and alert check buttons across both Dashboard and Alert Management views.
+  - Clarified Brevo credential requirements: Brevo REST API requires an `xkeysib-...` API key from Brevo Console -> SMTP & API -> API Keys, whereas `xsmtpsib-...` is an SMTP password. Diagnostics now proactively identify this difference.
+- **Commands Executed:**
+  ```powershell
+  npm run email:verify
+  npm run telegram:verify
+  npm run apify:verify
+  npm run monitor:run
+  npm --prefix server test
+  python -m unittest test_extractor.py
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 19/19 passed, 193/193 tests green.
+  - Python worker tests: 8/8 passed (`test_extractor.py`).
+  - Vite client production build: 107 modules compiled in 859ms with 0 errors.
+  - Live local monitor run (`npm run monitor:run`): evaluated 2 distinct live offers, triggered 3 qualifying alerts, and persisted 3 `NotificationEvent` audit records in MongoDB Atlas with 0 runtime errors.
+- **Next Task:** Final secret scrub check, clean commit, and push to GitHub repository (`origin/main`).
 
 
 

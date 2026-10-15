@@ -12,10 +12,8 @@ import Offer from '../models/Offer.js';
 import PriceObservation from '../models/PriceObservation.js';
 import Alert from '../models/Alert.js';
 import User from '../models/User.js';
-import NotificationEvent from '../models/NotificationEvent.js';
 import { evaluateAlert } from './alertEvaluator.js';
-import { sendEmail } from './notifications/email.js';
-import { sendMessage } from './notifications/telegram.js';
+import { dispatchAlertNotifications } from './alertDispatcher.js';
 
 // In-memory monitoring state for reporting via GET /api/monitor/status
 let monitorState = {
@@ -68,10 +66,7 @@ export async function runMonitoringCycle() {
       const offer = await Offer.findById(offerId);
       if (!offer) continue;
 
-      // Do not attempt live price monitoring for DummyJSON or mock.shop sample catalogs (Prompt Section 11)
-      if (offer.provider === 'dummyjson' || offer.provider === 'mockshop') {
-        continue;
-      }
+      // Refresh any tracked offer (fixtures, dummyjson, mockshop, scrapling, ebay)
 
       const fetchResult = await fetchOffer(offer);
       offersChecked++;
@@ -106,58 +101,7 @@ export async function runMonitoringCycle() {
             await alert.save();
 
             // Dispatch multi-channel notifications and record NotificationEvent
-            const user = await User.findById(alert.userId);
-            if (user) {
-              const channels = Array.isArray(alert.channels) && alert.channels.length > 0 ? alert.channels : ['email'];
-              const isSampleOffer = Boolean(offer.isSample || offer.dataStatus === 'sample');
-              const subjectTag = isSampleOffer ? '[PriceRadar Demo Alert]' : '[PriceRadar Alert]';
-              const demoNotice = isSampleOffer
-                ? '\n\n(Notice: This alert was triggered by a simulated sample/demo offer, not a verified live retailer drop.)'
-                : '';
-
-              for (const channel of channels) {
-                let sendResult = { success: false, errorMessage: null };
-                const message = `${evalResult.reason}${demoNotice}`;
-
-                if (channel === 'email') {
-                  sendResult = await sendEmail({
-                    to: user.email,
-                    subject: `${subjectTag} ${offer.title}`,
-                    text: `Hello ${user.name},\n\n${evalResult.reason}${demoNotice}\n\nView offer: ${offer.productUrl}\n\nPriceRadar Team`,
-                  });
-                } else if (channel === 'telegram') {
-                  if (user.telegramChatId) {
-                    sendResult = await sendMessage({
-                      chatId: user.telegramChatId,
-                      text: `<b>${subjectTag}</b>\n\n${evalResult.reason}${demoNotice ? '<i>' + demoNotice + '</i>' : ''}\n\n<a href="${offer.productUrl}">View Offer</a>`,
-                    });
-                  } else {
-                    sendResult = {
-                      success: false,
-                      errorMessage: 'User has not linked their Telegram account.',
-                    };
-                  }
-                }
-
-                try {
-                  await NotificationEvent.create({
-                    userId: user._id,
-                    alertId: alert._id,
-                    channel,
-                    status: sendResult.success ? 'sent' : 'failed',
-                    message,
-                    errorMessage: sendResult.errorMessage || undefined,
-                    dedupeKey: `${evalResult.dedupeKey}:${channel}`,
-                  });
-                } catch (eventErr) {
-                  if (eventErr.code === 11000) {
-                    console.log(`[monitor] Duplicate notification suppressed by index for alert ${alert._id}`);
-                  } else {
-                    console.error('[monitor] Error recording NotificationEvent:', eventErr.message);
-                  }
-                }
-              }
-            }
+            await dispatchAlertNotifications({ alert, offer, evalResult });
           } else if (evalResult.shouldRearm) {
             alert.armed = true;
             await alert.save();

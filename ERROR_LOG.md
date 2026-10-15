@@ -105,3 +105,120 @@ Whenever an error occurs during development:
 - **Files Changed:** `server/tests/priceComparison.test.js`.
 - **Prevention Steps:** Carefully review test argument expressions before execution.
 - **Related Errors:** None.
+
+---
+
+### ERR-004: Apify Amazon Actor Input Schema Validation Failure
+- **Date & Time:** 2026-10-15 09:41 IST
+- **Phase / Feature:** Apify Integration — Live Search Smoke Testing
+- **Status:** VERIFIED
+- **Exact Error Message:**
+  ```text
+  Status: 400
+  Response data: {
+    "error": {
+      "type": "invalid-input",
+      "message": "Input is not valid: Field input.categoryUrls is required"
+    }
+  }
+  ```
+- **Relevant Command / File:** `server/src/providers/apify.js` (`buildActorInput`)
+- **Root Cause:**
+  `junglee/free-amazon-product-scraper` requires the property name `categoryUrls` rather than `categoryOrProductUrls`.
+- **Diagnostic Steps Performed:**
+  Queried the Apify Actor metadata API (`https://api.apify.com/v2/actors/junglee~free-amazon-product-scraper`) and inspected its latest tagged build's `inputSchema.properties`.
+- **Solution Attempted:**
+  Updated `buildActorInput('amazon', query)` to produce `{ categoryUrls: [{ url }], maxItemsPerStartUrl, scrapeProductDetails }`.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  The subsequent execution of `npm --prefix server run apify:test -- --test-search="wireless earbuds"` succeeded with HTTP 201, returning 5 genuine products with verified titles, prices in paise, and Amazon product URLs.
+- **Files Changed:** `server/src/providers/apify.js`, `server/tests/apifyProvider.test.js`.
+- **Prevention Steps:**
+  Always query the Actor's live `inputSchema` via Apify API v2 instead of relying on community forum snippets.
+- **Related Errors:** None.
+
+---
+
+### ERR-005: Apify Meesho Actor Permission Approval Requirement
+- **Date & Time:** 2026-10-15 09:43 IST
+- **Phase / Feature:** Apify Integration — Multi-Retailer Verification
+- **Status:** INVESTIGATING
+- **Exact Error Message:**
+  ```text
+  Status: 403
+  Response data: {
+    "type": "full-permission-actor-not-approved",
+    "message": "This Actor requires full access to your account. You must approve its permissions before running it: https://console.apify.com/actors/ieBlkzFwOEsOIlWQ0?approvePermissions=true"
+  }
+  ```
+- **Relevant Command / File:** `server/src/providers/apify.js` (Meesho Actor execution)
+- **Root Cause:**
+  The Actor `scrapeai/meesho-product-scraper` requests full account permissions. Under Apify's security policy, third-party Actors requesting full account access cannot be executed programmatically via API token until the user explicitly approves permissions in their Apify Console UI.
+- **Diagnostic Steps Performed:**
+  Inspected the 403 error body and identified the approval URL.
+- **Solution Attempted:**
+  Documented the exact one-click approval URL for the user (`https://console.apify.com/actors/ieBlkzFwOEsOIlWQ0?approvePermissions=true`), while keeping Amazon India and Flipkart as fully verified live sources.
+- **Whether Solution Worked:** Awaiting user one-click approval in Apify Console.
+- **Files Changed:** `server/src/providers/apify.js`, `README.md`.
+- **Prevention Steps:**
+  Inspect third-party Actor permission requirements before integration.
+- **Related Errors:** None.
+
+---
+
+### ERR-006: Price Alert Non-Notification & Brevo Credential Format Mismatch
+- **Date & Time:** 2026-10-15 10:45 IST
+- **Phase / Feature:** Price Alert Evaluation & Notification Dispatch Verification
+- **Status:** VERIFIED
+- **Exact Error Message:**
+  ```text
+  Brevo API error 401: Key not found
+  ```
+- **Relevant Command / File:** `server/src/controllers/alertsController.js`, `server/src/services/notifications/email.js`, `server/src/services/priceMonitor.js`
+- **Root Cause:**
+  1. **Immediate Evaluation Gap:** `createAlert` in `alertsController.js` only persisted alerts with `status: 'active'`, `armed: true` to MongoDB without evaluating conditions at creation time. Since background monitoring operates on a 4-hour cycle, immediate user notifications did not occur.
+  2. **Brevo Key Format Mismatch:** `BREVO_API_KEY` was populated with a Brevo SMTP password (`xsmtpsib-...`) rather than a Transactional Email REST API key (`xkeysib-...`). Calling `https://api.brevo.com/v3/smtp/email` with an SMTP key returns HTTP 401: `Key not found`.
+  3. **Telegram Link State:** The user account had not completed Telegram linking (`telegramChatId: null`), causing Telegram notifications to be skipped.
+- **Diagnostic Steps Performed:**
+  1. Inspected created alerts and `NotificationEvent` audit collection in MongoDB Atlas (`NotificationEvent` count was 0).
+  2. Tested Brevo delivery using `sendEmail` which returned HTTP 401: `Key not found`.
+  3. Inspected the prefix of `BREVO_API_KEY` without exposing secrets and confirmed `xsmtpsib` key format.
+  4. Confirmed Telegram Bot `@PriceRadar_Alerts_Bot` (ID: 8618074027) is online and active.
+- **Solution Attempted:**
+  1. Extracted centralized `alertDispatcher.js` implementing multi-channel delivery and audit logging in `NotificationEvent` with unique `dedupeKey` protection.
+  2. Enhanced `createAlert` in `alertsController.js` to evaluate `target_price` alerts immediately upon creation against the latest valid offer price (`currentPrice <= targetPrice`). If satisfied, it disarms the alert, dispatches notifications across configured channels, and responds with `triggeredImmediately: true`.
+  3. Ensured `fixed_drop` alerts baseline against creation price and do not trigger on creation.
+  4. Added `getOfferById` (`GET /api/offers/:offerId`) and populated offer details on alerts so users see product titles and current prices.
+  5. Added on-demand "Refresh & Check Prices Now" triggers in `monitorController.js` (`POST /api/monitor/trigger`), DashboardPage, and AlertManagementPage.
+  6. Enhanced `verifyEmailConfig.js` to detect `xsmtpsib-` vs `xkeysib-` keys and output actionable remediation instructions.
+  7. Updated `verifyTelegramConfig.js` with automatic DB lookup for linked users when `--chat-id` is omitted.
+  8. Enhanced `AlertFormPage.jsx` with an immediate evaluation notice when entered target price is >= current price.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  - Running `npm run monitor:run` processed 2 distinct live offers, evaluated dependent alerts, and successfully triggered 3 alerts in MongoDB Atlas with `NotificationEvent` audit records.
+  - All 19 backend test suites (193 tests) passed green.
+  - Python worker tests (8/8) passed.
+  - Vite frontend production build succeeded in 859ms.
+- **Files Changed:**
+  - `server/src/services/alertDispatcher.js`
+  - `server/src/controllers/alertsController.js`
+  - `server/src/controllers/monitorController.js`
+  - `server/src/controllers/offersController.js`
+  - `server/src/routes/monitor.js`
+  - `server/src/routes/offers.js`
+  - `server/src/services/priceMonitor.js`
+  - `server/src/services/notifications/email.js`
+  - `server/src/jobs/verifyEmailConfig.js`
+  - `server/src/jobs/verifyTelegramConfig.js`
+  - `server/src/jobs/runMonitorLocally.js`
+  - `client/src/services/api.js`
+  - `client/src/pages/AlertFormPage.jsx`
+  - `client/src/pages/AlertManagementPage.jsx`
+  - `client/src/pages/DashboardPage.jsx`
+  - `server/tests/watchlistAndAlerts.test.js`
+  - `server/tests/monitor.test.js`
+- **Prevention Steps:**
+  - Always validate conditions immediately when user thresholds are already satisfied at configuration time.
+  - Distinguish SMTP passwords from REST API keys in environment configuration diagnostics.
+- **Related Errors:** None.
+

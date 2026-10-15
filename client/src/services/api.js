@@ -66,6 +66,10 @@ export function getProviderStatus() {
   return unwrap(api.get('/api/products/providers/status'));
 }
 
+export function getOffer(offerId) {
+  return unwrap(api.get(`/api/offers/${offerId}`));
+}
+
 export function getOfferHistory(offerId) {
   return unwrap(api.get(`/api/offers/${offerId}/history`));
 }
@@ -133,6 +137,21 @@ export function getTelegramLinkCode() {
 
 export function linkTelegram(linkCode, chatId) {
   return unwrap(api.post('/api/telegram/link', { linkCode, chatId }));
+}
+
+export function disconnectTelegram() {
+  return unwrap(api.post('/api/telegram/disconnect'));
+}
+
+// =========================================================================
+// Price Monitor Trigger & Status
+// =========================================================================
+export function triggerPriceRefresh() {
+  return unwrap(api.post('/api/monitor/trigger'));
+}
+
+export function getMonitorStatus() {
+  return unwrap(api.get('/api/monitor/status'));
 }
 
 export default api;
