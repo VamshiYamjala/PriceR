@@ -110,22 +110,31 @@ export default function ProductDetailPage() {
 
       {/* Honest Data Status Notice */}
       {isSampleProduct && (
-        <div className="alert alert-light border d-flex align-items-center gap-2 py-2 px-3 mb-4 rounded-3 text-muted small">
-          <span>ℹ️</span>
+        <div
+          className="d-flex align-items-center gap-3 p-3 mb-4 rounded-3 text-muted small"
+          style={{ background: 'var(--pr-mint-bg)', border: '1px solid var(--pr-border)' }}
+        >
+          <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
           <span>
-            <strong>Sample Demonstration Listing:</strong> This item is sourced from our free demonstration catalog ({product.sourceProvider || 'sample catalog'}). Genuine live market comparisons and price alerts are only enabled for verified retailer feeds.
+            <strong style={{ color: 'var(--pr-forest)' }}>Sample Demonstration Listing:</strong> This item is sourced from our demonstration catalog ({product.sourceProvider || 'sample catalog'}). Genuine live market comparisons and price alerts are enabled for verified retailer feeds.
           </span>
         </div>
       )}
 
       {/* Main Product Card */}
-      <div className="card shadow-sm mb-4 border bg-white">
-        <div className="card-body p-4">
-          <div className="d-flex flex-column flex-md-row gap-4 align-items-md-start mb-4 pb-3 border-bottom">
+      <div className="card border-0 mb-4 rounded-4" style={{ background: '#FFFFFF', border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}>
+        <div className="card-body p-4 p-md-5">
+          <div className="d-flex flex-column flex-md-row gap-4 align-items-md-start mb-4 pb-4 border-bottom">
             {product.imageUrl && (
               <div
-                className="d-flex align-items-center justify-content-center bg-light rounded border p-2 align-self-center align-self-md-start"
-                style={{ width: '180px', height: '180px', minWidth: '180px' }}
+                className="d-flex align-items-center justify-content-center rounded-3 p-3 align-self-center align-self-md-start"
+                style={{
+                  width: '200px',
+                  height: '200px',
+                  minWidth: '200px',
+                  background: 'var(--pr-image-bg)',
+                  border: '1px solid var(--pr-border)',
+                }}
               >
                 <img
                   src={product.imageUrl}
@@ -139,18 +148,23 @@ export default function ProductDetailPage() {
             <div className="flex-grow-1">
               <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
                 {product.category && (
-                  <span className="badge bg-secondary-subtle text-secondary border text-capitalize">
+                  <span
+                    className="badge text-uppercase tracking-wider fw-semibold px-2 py-1 rounded-pill"
+                    style={{ background: 'var(--pr-mint-bg)', color: 'var(--pr-forest)', fontSize: '0.72rem' }}
+                  >
                     {product.category}
                   </span>
                 )}
                 {isSampleProduct ? (
-                  <span className="badge badge-sample">Sample Catalog</span>
+                  <span className="badge pr-badge-sample rounded-pill px-2 py-1">Sample Catalog</span>
                 ) : (
-                  <span className="badge badge-live">Verified Retailer</span>
+                  <span className="badge pr-badge-live rounded-pill px-2 py-1">Verified Retailer</span>
                 )}
               </div>
 
-              <h1 className="h4 mb-2 fw-bold text-dark">{product.title}</h1>
+              <h1 className="h3 mb-2 fw-bold" style={{ color: 'var(--pr-text-dark)', letterSpacing: '-0.02em' }}>
+                {product.title}
+              </h1>
 
               {(product.brand || product.model || product.variant) && (
                 <p className="text-muted small mb-3">
@@ -159,7 +173,7 @@ export default function ProductDetailPage() {
               )}
 
               {product.description && (
-                <p className="text-muted small mb-0" style={{ maxWidth: '700px' }}>
+                <p className="text-muted small mb-0" style={{ maxWidth: '720px', lineHeight: '1.6' }}>
                   {product.description}
                 </p>
               )}
@@ -168,9 +182,23 @@ export default function ProductDetailPage() {
 
           {/* Offers Section */}
           <div className="mb-4">
-            <h2 className="h6 fw-bold mb-3">Available Store Offers &amp; Comparison</h2>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <span className="pr-section-eyebrow d-block mb-1">MARKET OVERVIEW</span>
+                <h2 className="h5 fw-bold mb-0" style={{ color: 'var(--pr-text-dark)' }}>
+                  Available Store Offers &amp; Comparison
+                </h2>
+              </div>
+              <span className="badge rounded-pill px-3 py-1" style={{ background: 'var(--pr-mint-bg)', color: 'var(--pr-forest)', fontSize: '0.8rem' }}>
+                {offers.length} offer{offers.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
             {offers.length === 0 ? (
-              <div className="p-3 bg-light rounded text-muted small">
+              <div
+                className="p-4 rounded-3 text-center text-muted small"
+                style={{ background: 'var(--pr-bg-soft)', border: '1px dashed var(--pr-border)' }}
+              >
                 No store offers currently available for this product.
               </div>
             ) : (
@@ -187,7 +215,8 @@ export default function ProductDetailPage() {
                         <div className="mt-1 text-end">
                           <button
                             type="button"
-                            className="btn btn-link btn-sm text-decoration-none small text-muted py-0"
+                            className="btn btn-link btn-sm text-decoration-none small py-0 fw-semibold"
+                            style={{ color: 'var(--pr-forest)', fontSize: '0.8rem' }}
                             onClick={() => loadOfferHistory(offer.id || offer._id)}
                           >
                             📈 {activeHistoryOffer === (offer.id || offer._id) ? 'Viewing Price History' : 'View Price History'}
@@ -202,11 +231,16 @@ export default function ProductDetailPage() {
 
           {/* Genuine Stored Observations History with Trend Chart */}
           {activeHistoryOffer && (
-            <div className="mt-4 pt-4 border-top">
+            <div className="mt-5 pt-4 border-top">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h3 className="h6 fw-bold mb-0">Verified Price Observation History & Trend</h3>
-                <span className="badge bg-light text-muted border small">
-                  {activeHistory ? activeHistory.length : 0} observation(s)
+                <div>
+                  <span className="pr-section-eyebrow d-block mb-1">PRICE INTELLIGENCE</span>
+                  <h3 className="h5 fw-bold mb-0" style={{ color: 'var(--pr-text-dark)' }}>
+                    Verified Observation History &amp; Trend
+                  </h3>
+                </div>
+                <span className="badge rounded-pill px-3 py-1" style={{ background: 'var(--pr-mint-bg)', color: 'var(--pr-forest)', fontSize: '0.8rem' }}>
+                  {activeHistory ? activeHistory.length : 0} observation{activeHistory?.length === 1 ? '' : 's'}
                 </span>
               </div>
 
@@ -224,23 +258,38 @@ export default function ProductDetailPage() {
                     const latestPrice = validPrices[0];
 
                     return (
-                      <div className="row g-2 mb-3">
+                      <div className="row g-3 mb-4">
                         <div className="col-sm-4">
-                          <div className="p-2 border rounded bg-light text-center">
-                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Lowest Observed</span>
-                            <span className="fw-bold text-success small">₹{(minPrice / 100).toLocaleString('en-IN')}</span>
+                          <div
+                            className="p-3 rounded-3 text-center"
+                            style={{ background: 'var(--pr-mint-bg)', border: '1px solid var(--pr-border)' }}
+                          >
+                            <span className="text-muted d-block small fw-medium mb-1">Lowest Observed</span>
+                            <span className="fs-5 fw-bold" style={{ color: 'var(--pr-forest)' }}>
+                              ₹{(minPrice / 100).toLocaleString('en-IN')}
+                            </span>
                           </div>
                         </div>
                         <div className="col-sm-4">
-                          <div className="p-2 border rounded bg-light text-center">
-                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Highest Observed</span>
-                            <span className="fw-bold text-dark small">₹{(maxPrice / 100).toLocaleString('en-IN')}</span>
+                          <div
+                            className="p-3 rounded-3 text-center"
+                            style={{ background: '#FFFFFF', border: '1px solid var(--pr-border)' }}
+                          >
+                            <span className="text-muted d-block small fw-medium mb-1">Highest Observed</span>
+                            <span className="fs-5 fw-bold" style={{ color: 'var(--pr-text-dark)' }}>
+                              ₹{(maxPrice / 100).toLocaleString('en-IN')}
+                            </span>
                           </div>
                         </div>
                         <div className="col-sm-4">
-                          <div className="p-2 border rounded bg-light text-center">
-                            <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Latest Recorded</span>
-                            <span className="fw-bold text-primary small">₹{(latestPrice / 100).toLocaleString('en-IN')}</span>
+                          <div
+                            className="p-3 rounded-3 text-center"
+                            style={{ background: '#FFFFFF', border: '1px solid var(--pr-border)' }}
+                          >
+                            <span className="text-muted d-block small fw-medium mb-1">Latest Recorded</span>
+                            <span className="fs-5 fw-bold" style={{ color: 'var(--pr-forest)' }}>
+                              ₹{(latestPrice / 100).toLocaleString('en-IN')}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -259,9 +308,9 @@ export default function ProductDetailPage() {
                     const min = Math.min(...prices);
                     const max = Math.max(...prices);
                     const range = max - min || 1;
-                    const width = 500;
-                    const height = 80;
-                    const padding = 15;
+                    const width = 600;
+                    const height = 90;
+                    const padding = 16;
 
                     const coords = points.map((p, idx) => {
                       const x = padding + (idx / (points.length - 1)) * (width - padding * 2);
@@ -270,12 +319,15 @@ export default function ProductDetailPage() {
                     }).join(' ');
 
                     return (
-                      <div className="p-3 bg-light rounded border mb-3">
+                      <div
+                        className="p-3 rounded-3 mb-4"
+                        style={{ background: 'var(--pr-bg-soft)', border: '1px solid var(--pr-border)' }}
+                      >
                         <span className="text-muted small fw-semibold d-block mb-2">Price Trend Line (Paise):</span>
-                        <svg viewBox={`0 0 ${width} ${height}`} className="w-100" style={{ maxHeight: '90px' }}>
+                        <svg viewBox={`0 0 ${width} ${height}`} className="w-100" style={{ maxHeight: '100px' }}>
                           <polyline
                             fill="none"
-                            stroke="#0F6E56"
+                            stroke="var(--pr-forest)"
                             strokeWidth="3"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -286,30 +338,28 @@ export default function ProductDetailPage() {
                     );
                   })()}
 
-                  <div className="table-responsive">
-                    <table className="table table-sm table-bordered small align-middle mb-0">
-                      <thead className="table-light">
+                  <div className="table-responsive rounded-3" style={{ border: '1px solid var(--pr-border)' }}>
+                    <table className="table table-hover small align-middle mb-0">
+                      <thead style={{ background: 'var(--pr-bg-soft)' }}>
                         <tr>
-                          <th>Observation Timestamp</th>
-                          <th>Observed Price</th>
-                          <th>Fetch Status</th>
+                          <th className="py-2 px-3 fw-semibold text-muted">Observation Timestamp</th>
+                          <th className="py-2 px-3 fw-semibold text-muted">Observed Price</th>
+                          <th className="py-2 px-3 fw-semibold text-muted">Fetch Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {activeHistory.slice(0, 8).map((h, idx) => (
                           <tr key={idx}>
-                            <td>{new Date(h.fetchedAt).toLocaleString('en-IN')}</td>
-                            <td className="fw-semibold">
+                            <td className="py-2 px-3">{new Date(h.fetchedAt).toLocaleString('en-IN')}</td>
+                            <td className="py-2 px-3 fw-bold" style={{ color: 'var(--pr-forest)' }}>
                               {h.priceInPaise
                                 ? `₹${(h.priceInPaise / 100).toLocaleString('en-IN')}`
                                 : '—'}
                             </td>
-                            <td>
+                            <td className="py-2 px-3">
                               <span
-                                className={`badge ${
-                                  h.status === 'success'
-                                    ? 'bg-success-subtle text-success'
-                                    : 'bg-danger-subtle text-danger'
+                                className={`badge rounded-pill ${
+                                  h.status === 'success' ? 'pr-badge-live' : 'bg-danger-subtle text-danger'
                                 }`}
                               >
                                 {h.status}

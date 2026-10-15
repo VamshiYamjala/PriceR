@@ -14,20 +14,10 @@ export default function SearchPage() {
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | loading | success | empty | error
   const [sortBy, setSortBy] = useState('relevance'); // relevance | price_asc | price_desc
   const [dataFilter, setDataFilter] = useState(providerParam); // all | live | sample
   const [retailer, setRetailer] = useState(retailerParam);
-
-  // Load category list on mount
-  useEffect(() => {
-    api.getCategories()
-      .then((res) => {
-        if (res?.categories) setCategories(res.categories);
-      })
-      .catch(() => {});
-  }, []);
 
   const runSearch = useCallback(async (q, cat, prov, ret) => {
     setStatus('loading');
@@ -41,7 +31,7 @@ export default function SearchPage() {
       const results = data?.products || [];
       setProducts(results);
       setStatus(results.length === 0 ? 'empty' : 'success');
-    } catch (err) {
+    } catch (_) {
       setStatus('error');
     }
   }, []);
@@ -107,207 +97,201 @@ export default function SearchPage() {
 
   if (sortBy === 'price_asc') {
     displayedProducts.sort((a, b) => {
-      const minA = a.offers?.length ? Math.min(...a.offers.map((o) => o.priceInPaise)) : Infinity;
-      const minB = b.offers?.length ? Math.min(...b.offers.map((o) => o.priceInPaise)) : Infinity;
-      return minA - minB;
+      const pA = Math.min(...(a.offers || []).map((o) => o.priceInPaise || Infinity));
+      const pB = Math.min(...(b.offers || []).map((o) => o.priceInPaise || Infinity));
+      return pA - pB;
     });
   } else if (sortBy === 'price_desc') {
     displayedProducts.sort((a, b) => {
-      const maxA = a.offers?.length ? Math.max(...a.offers.map((o) => o.priceInPaise)) : -Infinity;
-      const maxB = b.offers?.length ? Math.max(...b.offers.map((o) => o.priceInPaise)) : -Infinity;
-      return maxB - maxA;
+      const pA = Math.max(...(a.offers || []).map((o) => o.priceInPaise || 0));
+      const pB = Math.max(...(b.offers || []).map((o) => o.priceInPaise || 0));
+      return pB - pA;
     });
   }
 
+  const categories = [
+    { id: 'all', label: 'All products' },
+    { id: 'audio', label: 'Audio' },
+    { id: 'laptops', label: 'Laptops' },
+    { id: 'cameras', label: 'Cameras' },
+    { id: 'smartphones', label: 'Smartphones' },
+  ];
+
   return (
-    <div className="py-3">
-      {/* Search Header */}
-      <div className="card shadow-sm mb-4 border-0 bg-white p-3">
-        <form onSubmit={handleSubmit} className="mb-3">
-          <div className="input-group">
-            <span className="input-group-text bg-light border-end-0">🔍</span>
+    <div className="py-4">
+      <div className="container">
+        {/* Page Header */}
+        <div className="mb-4">
+          <span className="eyebrow">FIND SOMETHING WORTH TRACKING</span>
+          <h1 className="fw-bold tracking-tight mb-1" style={{ fontSize: '2.5rem' }}>
+            Product search
+          </h1>
+          <p className="text-muted mb-0">Your next great purchase starts here.</p>
+        </div>
+
+        {/* Large Search Box */}
+        <form onSubmit={handleSubmit} className="mb-4">
+          <div className="search-hero-box shadow-sm">
+            <div className="ps-2 text-muted">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
             <input
               type="text"
-              className="form-control border-start-0"
-              placeholder="Search by product title, brand, or model..."
+              placeholder="What are you looking for?"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              aria-label="Search products"
             />
-            <button type="submit" className="btn btn-primary px-4">
-              Search
+            <button type="submit" className="btn-lime px-4 py-2 border-0">
+              <span>Search</span>
+              <span>→</span>
             </button>
           </div>
         </form>
 
-        {/* Filters and Controls */}
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top">
-          <div className="d-flex flex-wrap align-items-center gap-2">
-            <span className="small text-muted fw-semibold">Source:</span>
+        {/* Category Filter Chips & Data Source Controls */}
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style={{ borderColor: 'var(--pr-border)' }}>
+          {/* Categories */}
+          <div className="d-flex flex-wrap gap-2">
+            {categories.map((cat) => {
+              const isSelected = (!categoryParam && cat.id === 'all') || categoryParam === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`filter-chip ${isSelected ? 'active' : ''}`}
+                  onClick={() => handleCategoryChange(cat.id)}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Provenance Selector (Live vs Sample vs All) */}
+          <div className="d-flex align-items-center gap-2">
             <div className="btn-group btn-group-sm" role="group">
               <button
                 type="button"
-                className={`btn ${dataFilter === 'all' ? 'btn-dark' : 'btn-outline-secondary'}`}
+                className={`btn ${dataFilter === 'all' ? 'btn-forest' : 'btn-outline-forest'}`}
                 onClick={() => handleFilterChange('all')}
               >
                 All Sources
               </button>
               <button
                 type="button"
-                className={`btn ${dataFilter === 'sample' ? 'btn-dark' : 'btn-outline-secondary'}`}
-                onClick={() => handleFilterChange('sample')}
+                className={`btn ${dataFilter === 'live' ? 'btn-forest' : 'btn-outline-forest'}`}
+                onClick={() => handleFilterChange('live')}
               >
-                Sample Catalogs
+                ● Live Retailers
               </button>
               <button
                 type="button"
-                className={`btn ${dataFilter === 'live' ? 'btn-dark' : 'btn-outline-secondary'}`}
-                onClick={() => handleFilterChange('live')}
+                className={`btn ${dataFilter === 'sample' ? 'btn-forest' : 'btn-outline-forest'}`}
+                onClick={() => handleFilterChange('sample')}
               >
-                ● Verified Live (Apify)
+                Sample Catalog
               </button>
             </div>
 
             {dataFilter === 'live' && (
               <select
-                className="form-select form-select-sm w-auto"
+                className="form-select form-select-sm"
                 value={retailer}
                 onChange={(e) => handleRetailerChange(e.target.value)}
-                title="Select live retail marketplace"
+                style={{ width: 'auto', borderRadius: 'var(--pr-radius-md)' }}
               >
                 <option value="amazon">Amazon India</option>
                 <option value="flipkart">Flipkart</option>
                 <option value="meesho">Meesho</option>
               </select>
             )}
+          </div>
+        </div>
 
-            {categories.length > 0 && (
-              <select
-                className="form-select form-select-sm w-auto"
-                value={categoryParam || 'all'}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-              >
-                <option value="all">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c.charAt(0).toUpperCase() + c.slice(1).replace('-', ' ')}
-                  </option>
-                ))}
-              </select>
-            )}
+        {/* Results Metadata Bar: Count on Left, Sort on Right */}
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div className="small text-muted font-monospace">
+            {status === 'loading'
+              ? 'Searching verified databases…'
+              : `${displayedProducts.length} ${dataFilter === 'sample' ? 'sample products' : 'products found'}`}
           </div>
 
           <div className="d-flex align-items-center gap-2">
-            <span className="small text-muted fw-semibold">Sort by:</span>
+            <span className="small text-muted d-none d-sm-inline">Sort by:</span>
             <select
-              className="form-select form-select-sm w-auto"
+              className="form-select form-select-sm"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
+              style={{ width: 'auto', borderRadius: 'var(--pr-radius-md)' }}
             >
-              <option value="relevance">Relevance</option>
+              <option value="relevance">Recommended</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
             </select>
           </div>
         </div>
-      </div>
 
-      {/* Loading Skeleton */}
-      {status === 'loading' && (
-        <div className="d-flex flex-column gap-3">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="card p-3">
-              <div className="d-flex gap-3 align-items-center">
-                <div className="skeleton-box" style={{ width: '80px', height: '80px', borderRadius: '8px' }}></div>
-                <div className="flex-grow-1">
-                  <div className="skeleton-box mb-2" style={{ width: '60%', height: '20px' }}></div>
-                  <div className="skeleton-box mb-3" style={{ width: '40%', height: '14px' }}></div>
-                  <div className="skeleton-box" style={{ width: '80%', height: '36px' }}></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {status === 'empty' && (
-        <div className="card text-center p-5 border-0 shadow-sm bg-white">
-          <div className="fs-1 mb-2">🔎</div>
-          <h3 className="h5 fw-bold">No matching products found</h3>
-          <p className="text-muted small mb-3">
-            We couldn&apos;t find any products matching your query and active filters.
-          </p>
-          {dataFilter === 'live' && (
-            <div className="alert alert-light border small text-start mx-auto mb-3" style={{ maxWidth: '520px' }}>
-              <div className="fw-semibold text-primary mb-1">ℹ️ Live Retailer Search (Apify)</div>
-              <div>Live search requires <code>APIFY_API_TOKEN</code> configured in <code>server/.env</code>. If unconfigured or the retailer returns no results, switch to <strong>All Sources</strong> or <strong>Sample Catalogs</strong> to explore demonstration products.</div>
-            </div>
-          )}
-          <div className="d-flex justify-content-center gap-2">
+        {/* Search Results Grid */}
+        {status === 'loading' ? (
+          <div className="text-center py-5">
+            <div className="spinner-border text-success mb-3" role="status" />
+            <p className="text-muted small">Querying supported product providers...</p>
+          </div>
+        ) : status === 'error' ? (
+          <div className="card-pr p-5 text-center my-4 bg-white">
+            <h3 className="h5 fw-bold text-danger mb-2">Search request encountered an error</h3>
+            <p className="text-muted small mb-3">Please try refining your search keywords or check network connectivity.</p>
             <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => {
-                setSearchParams({ q: 'Samsung' });
-              }}
+              className="btn-forest btn-sm"
+              onClick={() => runSearch(queryParam, categoryParam, dataFilter, retailer)}
             >
-              Try &quot;Samsung&quot;
-            </button>
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => {
-                setSearchParams({ q: 'Sony' });
-              }}
-            >
-              Try &quot;Sony&quot;
-            </button>
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => {
-                setSearchParams({ q: 'boAt' });
-              }}
-            >
-              Try &quot;boAt&quot;
+              Retry Search
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {status === 'error' && (
-        <div className="alert alert-danger d-flex justify-content-between align-items-center shadow-sm">
-          <span>Failed to load search results. Please verify connection and try again.</span>
-          <button
-            className="btn btn-outline-danger btn-sm"
-            onClick={() => runSearch(queryParam, categoryParam, providerParam)}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Results List */}
-      {status === 'success' && (
-        <>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="small text-muted fw-semibold">
-              Showing {displayedProducts.length} product(s)
-              {queryParam ? ` for "${queryParam}"` : ''}
-              {categoryParam ? ` in ${categoryParam}` : ''}
-            </span>
+        ) : displayedProducts.length === 0 ? (
+          <div className="card-pr p-5 text-center my-4 bg-white">
+            <div
+              className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+              style={{ width: '56px', height: '56px', backgroundColor: 'var(--pr-mint-bg)', color: 'var(--pr-forest)' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+            <h3 className="h5 fw-bold mb-1">No products found</h3>
+            <p className="text-muted small mb-3">
+              We couldn&apos;t find any matching items for &ldquo;{inputValue}&rdquo;. Try another brand or generic keyword.
+            </p>
+            <div className="d-flex justify-content-center gap-2">
+              <button
+                className="btn-outline-forest btn-sm"
+                onClick={() => {
+                  setInputValue('');
+                  setSearchParams({});
+                }}
+              >
+                Clear Filters
+              </button>
+            </div>
           </div>
-
-          <ul className="list-unstyled d-flex flex-column gap-3 mb-4" aria-label="Search results">
+        ) : (
+          <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {displayedProducts.map((product) => (
-              <li key={product.id}>
+              <div key={product.id} className="col">
                 <ProductCard
                   product={product}
                   onOpen={() => navigate(`/products/${product.id}`)}
                 />
-              </li>
+              </div>
             ))}
-          </ul>
-        </>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

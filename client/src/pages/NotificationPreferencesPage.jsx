@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import * as api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import InternalSidebar from '../components/InternalSidebar';
 
 export default function NotificationPreferencesPage() {
+  const { isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [telegramChatId, setTelegramChatId] = useState(null);
@@ -31,11 +35,15 @@ export default function NotificationPreferencesPage() {
   }
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     loadPreferences();
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   async function handleSaveEmail(e) {
     e.preventDefault();
@@ -58,7 +66,6 @@ export default function NotificationPreferencesPage() {
       setLinkData(res);
       setManualCode(res.linkCode);
 
-      // Start automatic polling every 3 seconds to check if user pressed /start in Telegram
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       pollTimerRef.current = setInterval(async () => {
         try {
@@ -117,152 +124,237 @@ export default function NotificationPreferencesPage() {
   }
 
   return (
-    <div className="row justify-content-center py-3">
-      <div className="col-md-8 col-lg-7">
-        <div className="card shadow-sm mb-4 border bg-white">
-          <div className="card-body p-4">
-            <h1 className="h5 fw-bold mb-3">Notification Preferences</h1>
-            <p className="text-muted small mb-4">
-              Configure how you receive real-time price-drop alerts for items in your watchlist.
-            </p>
+    <div className="py-2">
+      {/* Top Header */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 mb-4 border-bottom">
+        <div>
+          <span className="pr-section-eyebrow d-block mb-1">YOUR PRICERADAR</span>
+          <h1 className="h3 fw-bold mb-1" style={{ color: 'var(--pr-text-dark)', letterSpacing: '-0.02em' }}>
+            Preferences
+          </h1>
+          <p className="text-muted small mb-0">
+            Configure how and where you receive real-time price alerts.
+          </p>
+        </div>
+      </div>
 
-            {message && <div className="alert alert-success py-2 small">{message}</div>}
-            {error && <div className="alert alert-danger py-2 small">{error}</div>}
+      <div className="row g-4">
+        {/* Navigation Sidebar */}
+        <div className="col-12 col-lg-3">
+          <InternalSidebar />
+        </div>
 
-            {loading ? (
-              <div className="text-center py-4">
-                <div className="spinner-border spinner-border-sm text-primary" role="status" />
+        {/* Preferences Content */}
+        <div className="col-12 col-lg-9">
+          {!isAuthenticated ? (
+            <div
+              className="p-5 text-center rounded-4 bg-white"
+              style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
+            >
+              <div
+                className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
+                style={{ width: '64px', height: '64px', background: 'var(--pr-mint-bg)', color: 'var(--pr-forest)' }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
               </div>
-            ) : (
-              <>
-                {/* Email Section */}
-                <form onSubmit={handleSaveEmail} className="mb-4">
-                  <h2 className="h6 fw-bold mb-2">📧 Email Notifications</h2>
-                  <div className="mb-3">
-                    <label className="form-label small text-muted" htmlFor="pref-email">
-                      Registered Alert Email
-                    </label>
-                    <input
-                      id="pref-email"
-                      type="email"
-                      className="form-control"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
+              <h2 className="h5 fw-bold mb-2" style={{ color: 'var(--pr-text-dark)' }}>
+                Sign in to view notification preferences
+              </h2>
+              <p className="text-muted small mx-auto mb-4" style={{ maxWidth: '420px' }}>
+                Set up your Brevo verified email address and link your personal Telegram account to receive instant price-drop alerts.
+              </p>
+              <div className="d-flex justify-content-center gap-2">
+                <Link to="/login" className="btn btn-pr-primary px-4 py-2">
+                  Log in to your account →
+                </Link>
+                <Link to="/register" className="btn btn-pr-outline-forest px-4 py-2">
+                  Create account
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="d-flex flex-column gap-4">
+              {message && (
+                <div className="alert alert-success py-2.5 px-3 small rounded-3" role="alert">
+                  {message}
+                </div>
+              )}
+              {error && (
+                <div className="alert alert-danger py-2.5 px-3 small rounded-3" role="alert">
+                  {error}
+                </div>
+              )}
+
+              {loading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border" style={{ color: 'var(--pr-forest)' }} role="status">
+                    <span className="visually-hidden">Loading preferences…</span>
                   </div>
-                  <button type="submit" className="btn btn-outline-primary btn-sm">
-                    Save Email Address
-                  </button>
-                </form>
-
-                <hr className="my-4" />
-
-                {/* Telegram Section */}
-                <div>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h2 className="h6 fw-bold mb-0">✈️ Telegram Notifications</h2>
-                    {telegramLinked ? (
-                      <span className="badge bg-success-subtle text-success border border-success-subtle">
-                        ● Connected
-                      </span>
-                    ) : (
-                      <span className="badge bg-secondary-subtle text-secondary border">
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-
-                  {telegramLinked ? (
-                    <div className="p-3 bg-light rounded border mb-3">
-                      <p className="small mb-1 text-dark fw-semibold">
-                        ✅ Connected to @PriceRadar_Alerts_Bot
-                      </p>
-                      {telegramChatId && (
-                        <p className="small text-muted mb-3 font-monospace">
-                          Chat ID: {telegramChatId}
-                        </p>
-                      )}
-                      <p className="small text-muted mb-3">
-                        You can now choose Telegram when creating or editing price alerts.
-                      </p>
-                      <button
-                        type="button"
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={handleDisconnect}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? 'Disconnecting…' : 'Disconnect Telegram'}
-                      </button>
+                </div>
+              ) : (
+                <>
+                  {/* Email Section */}
+                  <div
+                    className="p-4 p-md-5 rounded-4 bg-white"
+                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
+                  >
+                    <div className="d-flex align-items-center gap-2 mb-1">
+                      <span className="pr-section-eyebrow">PRIMARY CHANNEL</span>
                     </div>
-                  ) : (
-                    <div>
-                      <p className="small text-muted mb-3">
-                        Receive instantaneous price alerts in Telegram via <strong>@PriceRadar_Alerts_Bot</strong>.
-                      </p>
+                    <h2 className="h5 fw-bold mb-3" style={{ color: 'var(--pr-text-dark)' }}>
+                      📧 Email Notifications
+                    </h2>
+                    <p className="text-muted small mb-4">
+                      Price drop notifications are formatted with clean store summaries and delivered via our verified Brevo transactional email engine.
+                    </p>
 
-                      {!linkData ? (
+                    <form onSubmit={handleSaveEmail}>
+                      <div className="mb-3" style={{ maxWidth: '460px' }}>
+                        <label className="form-label small fw-semibold text-muted" htmlFor="pref-email">
+                          REGISTERED ALERT EMAIL
+                        </label>
+                        <input
+                          id="pref-email"
+                          type="email"
+                          className="form-control rounded-3 py-2"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          style={{ border: '1px solid var(--pr-border)' }}
+                        />
+                      </div>
+                      <button type="submit" className="btn btn-pr-primary btn-sm px-4 py-2">
+                        Save Email Address
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Telegram Section */}
+                  <div
+                    className="p-4 p-md-5 rounded-4 bg-white"
+                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
+                  >
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span className="pr-section-eyebrow">INSTANT BOT CHANNEL</span>
+                      {telegramLinked ? (
+                        <span className="badge rounded-pill pr-badge-live px-2.5 py-1">
+                          ● Connected
+                        </span>
+                      ) : (
+                        <span className="badge rounded-pill bg-secondary-subtle text-secondary px-2.5 py-1">
+                          Not Connected
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="h5 fw-bold mb-3" style={{ color: 'var(--pr-text-dark)' }}>
+                      ✈️ Telegram Notifications
+                    </h2>
+
+                    {telegramLinked ? (
+                      <div
+                        className="p-4 rounded-3"
+                        style={{ background: 'var(--pr-mint-bg)', border: '1px solid var(--pr-border)' }}
+                      >
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <span style={{ fontSize: '1.25rem' }}>✅</span>
+                          <span className="fw-bold" style={{ color: 'var(--pr-forest)' }}>
+                            Connected to @PriceRadar_Alerts_Bot
+                          </span>
+                        </div>
+                        {telegramChatId && (
+                          <p className="small text-muted font-monospace mb-2">
+                            Chat ID: {telegramChatId}
+                          </p>
+                        )}
+                        <p className="small text-muted mb-3">
+                          Your Telegram account is paired. You can select Telegram when setting up or modifying price alerts.
+                        </p>
                         <button
                           type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={handleStartConnect}
+                          className="btn btn-link text-danger text-decoration-none small p-0 fw-semibold"
+                          onClick={handleDisconnect}
                           disabled={actionLoading}
                         >
-                          {actionLoading ? 'Generating Link…' : 'Connect Telegram'}
+                          {actionLoading ? 'Disconnecting…' : 'Disconnect Telegram'}
                         </button>
-                      ) : (
-                        <div className="p-3 bg-light rounded border">
-                          <h3 className="h6 fw-bold mb-2">Step 1: Open Bot &amp; Press Start</h3>
-                          <p className="small text-muted mb-3">
-                            Click the button below to open Telegram and press <strong>Start</strong>. Your code will be automatically recognized:
-                          </p>
-                          <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
-                            <a
-                              href={linkData.botDeepLink || `https://t.me/${linkData.botUsername}?start=${linkData.linkCode}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-primary"
-                            >
-                              Open @{linkData.botUsername} in Telegram ↗
-                            </a>
-                            <span className="small text-muted">
-                              One-time code: <strong className="font-monospace text-dark fs-6">{linkData.linkCode}</strong>
-                            </span>
-                          </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-muted small mb-4">
+                          Receive instant, zero-latency price drop notifications in Telegram via <strong>@PriceRadar_Alerts_Bot</strong>.
+                        </p>
 
-                          <div className="d-flex align-items-center gap-2 small text-muted mb-3">
-                            <div className="spinner-grow spinner-grow-sm text-primary" role="status" />
-                            <span>Waiting for you to click Start in Telegram...</span>
-                          </div>
-
-                          <hr className="my-2" />
-
-                          <form onSubmit={handleManualLink} className="mt-2">
-                            <label className="form-label small text-muted" htmlFor="manual-code">
-                              Or enter code manually if needed:
-                            </label>
-                            <div className="input-group input-group-sm" style={{ maxWidth: '300px' }}>
-                              <input
-                                id="manual-code"
-                                type="text"
-                                className="form-control font-monospace"
-                                placeholder="6-digit code"
-                                value={manualCode}
-                                onChange={(e) => setManualCode(e.target.value)}
-                              />
-                              <button type="submit" className="btn btn-outline-secondary" disabled={actionLoading}>
-                                Verify
-                              </button>
+                        {!linkData ? (
+                          <button
+                            type="button"
+                            className="btn btn-pr-primary px-4 py-2"
+                            onClick={handleStartConnect}
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? 'Generating Link…' : 'Connect Telegram →'}
+                          </button>
+                        ) : (
+                          <div
+                            className="p-4 rounded-3"
+                            style={{ background: 'var(--pr-bg-soft)', border: '1px solid var(--pr-border)' }}
+                          >
+                            <h3 className="h6 fw-bold mb-2" style={{ color: 'var(--pr-text-dark)' }}>
+                              Step 1: Open Bot &amp; Press Start
+                            </h3>
+                            <p className="small text-muted mb-3">
+                              Click the button below to launch Telegram and tap <strong>Start</strong>. Your pairing code is attached automatically:
+                            </p>
+                            <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+                              <a
+                                href={linkData.botDeepLink || `https://t.me/${linkData.botUsername}?start=${linkData.linkCode}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-pr-primary px-3 py-2"
+                              >
+                                Open @{linkData.botUsername} in Telegram ↗
+                              </a>
+                              <span className="small text-muted">
+                                Pairing code: <strong className="font-monospace text-dark fs-6">{linkData.linkCode}</strong>
+                              </span>
                             </div>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+
+                            <div className="d-flex align-items-center gap-2 small text-muted mb-3">
+                              <div className="spinner-grow spinner-grow-sm" style={{ color: 'var(--pr-forest)' }} role="status" />
+                              <span>Waiting for you to click Start in Telegram…</span>
+                            </div>
+
+                            <hr className="my-3" />
+
+                            <form onSubmit={handleManualLink}>
+                              <label className="form-label small text-muted fw-medium" htmlFor="manual-code">
+                                Or enter code manually if needed:
+                              </label>
+                              <div className="input-group input-group-sm" style={{ maxWidth: '320px' }}>
+                                <input
+                                  id="manual-code"
+                                  type="text"
+                                  className="form-control font-monospace"
+                                  placeholder="6-digit code"
+                                  value={manualCode}
+                                  onChange={(e) => setManualCode(e.target.value)}
+                                />
+                                <button type="submit" className="btn btn-pr-secondary" disabled={actionLoading}>
+                                  Verify
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

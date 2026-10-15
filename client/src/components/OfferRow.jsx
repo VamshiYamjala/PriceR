@@ -40,7 +40,6 @@ export default function OfferRow({ offer, isLowest }) {
     maximumFractionDigits: 0,
   });
 
-  // Any offer with an id (including persisted DummyJSON, Scrapling, eBay, etc.) can be tracked
   const isTrackedOffer = Boolean(offer.id || offer._id);
 
   async function handleAddToWatchlist(e) {
@@ -65,37 +64,49 @@ export default function OfferRow({ offer, isLowest }) {
   const isSample = offer.isSample || offer.dataStatus === 'sample';
 
   return (
-    <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center border rounded p-3 gap-2 bg-white">
+    <div
+      className="card-pr p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
+      style={{ backgroundColor: '#FFFFFF' }}
+    >
       <div>
         <div className="d-flex align-items-center gap-2 mb-1">
-          <span className="fw-semibold text-secondary small">
+          <span className="fw-semibold text-dark small">
             {formatProviderName(offer)}
           </span>
           {isSample ? (
-            <span className="badge badge-sample small" title="Simulated demonstration data">
-              Sample Data
-            </span>
+            <span className="badge-sample-tag">Sample Data</span>
           ) : (
-            <span className="badge badge-live small" title="Verified live retailer offer">
-              ● Live Retailer
+            <span className="badge-live-tag">● Live Retailer</span>
+          )}
+          {isLowest && (
+            <span
+              className="badge px-2 py-1"
+              style={{ backgroundColor: 'var(--pr-mint-bg)', color: 'var(--pr-forest)', border: '1px solid #C8DEC3', fontSize: '0.75rem' }}
+            >
+              Lowest Price
             </span>
           )}
         </div>
 
-        <div className="fs-5 fw-bold text-dark d-flex align-items-baseline gap-2">
-          {priceInRupees}
-          {isLowest && <span className="badge badge-lowest small">Lowest price</span>}
+        <div className="d-flex align-items-baseline gap-2">
+          <span
+            className="fw-bold"
+            style={{ fontSize: '1.35rem', color: 'var(--pr-text-dark)', letterSpacing: '-0.02em' }}
+          >
+            {priceInRupees}
+          </span>
+          {offer.originalPrice && offer.originalCurrency && offer.originalCurrency !== 'INR' && (
+            <span className="small text-muted">
+              (Orig: {offer.originalCurrency} {offer.originalPrice})
+            </span>
+          )}
         </div>
 
-        {offer.originalPrice && offer.originalCurrency && offer.originalCurrency !== 'INR' && (
-          <div className="text-muted small">
-            Converted from {offer.originalCurrency} {offer.originalPrice}
-          </div>
-        )}
-
-        <div className="mt-1 d-flex gap-2 align-items-center">
+        <div className="d-flex gap-2 align-items-center mt-1">
           {offer.availability === 'out_of_stock' && (
-            <span className="badge bg-danger-subtle text-danger">Out of stock</span>
+            <span className="badge bg-danger-subtle text-danger border border-danger-subtle small">
+              Out of stock
+            </span>
           )}
           {watchlistStatus && (
             <span className="small text-success fw-semibold">{watchlistStatus}</span>
@@ -108,24 +119,32 @@ export default function OfferRow({ offer, isLowest }) {
           isAuthenticated && (
             <>
               <button
-                className="btn btn-outline-secondary btn-sm"
+                type="button"
+                className="btn-outline-forest btn-sm"
                 onClick={handleAddToWatchlist}
                 disabled={addingToWatchlist}
-                title="Add to your personal price watchlist"
+                title="Save offer to personal watchlist"
               >
-                {addingToWatchlist ? 'Adding…' : '+ Watchlist'}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                <span>{addingToWatchlist ? 'Adding…' : 'Watchlist'}</span>
               </button>
               <Link
                 to={`/alerts/new?offerId=${offer.id || offer._id}`}
-                className="btn btn-outline-primary btn-sm"
-                title="Configure smart price drop alert"
+                className="btn-outline-forest btn-sm"
+                title="Create a price-drop alert"
               >
-                🔔 Set Alert
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                <span>Set Alert</span>
               </Link>
             </>
           )
         ) : (
-          <span className="badge bg-light text-muted border small py-2 px-2">
+          <span className="small text-muted py-1 px-2 border rounded bg-light">
             Catalog Discovery
           </span>
         )}
@@ -135,10 +154,11 @@ export default function OfferRow({ offer, isLowest }) {
             href={offer.productUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-primary btn-sm"
+            className="btn-forest btn-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            View on {formatProviderName(offer).split(' ')[0]} ↗
+            <span>View on {formatProviderName(offer).split(' ')[0]}</span>
+            <span>↗</span>
           </a>
         )}
       </div>

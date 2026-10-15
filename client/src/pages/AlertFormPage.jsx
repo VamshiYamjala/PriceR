@@ -118,38 +118,86 @@ export default function AlertFormPage() {
   if (initialLoading) {
     return (
       <div className="text-center py-5">
-        <div className="spinner-border text-primary" role="status" />
+        <div className="spinner-border" style={{ color: 'var(--pr-forest)' }} role="status">
+          <span className="visually-hidden">Loading alert…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="row justify-content-center py-3">
-      <div className="col-md-7 col-lg-6">
-        <div className="card shadow-sm">
-          <div className="card-body p-4">
-            <h1 className="h5 mb-3">{isEditMode ? 'Edit Price Alert' : 'Create Price Alert'}</h1>
+    <div className="row justify-content-center py-4">
+      <div className="col-12 col-md-8 col-lg-6">
+        <div className="mb-3">
+          <Link to="/alerts" className="text-decoration-none small fw-semibold" style={{ color: 'var(--pr-forest)' }}>
+            ← Back to Price Alerts
+          </Link>
+        </div>
+
+        <div
+          className="card border-0 rounded-4 bg-white"
+          style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
+        >
+          <div className="card-body p-4 p-md-5">
+            <span className="pr-section-eyebrow d-block mb-1">CONFIGURATION</span>
+            <h1 className="h4 fw-bold mb-3" style={{ color: 'var(--pr-text-dark)', letterSpacing: '-0.02em' }}>
+              {isEditMode ? 'Edit Price Alert' : 'Create Price Alert'}
+            </h1>
+
+            {error && (
+              <div className="alert alert-danger py-2 px-3 small rounded-3 mb-4" role="alert">
+                {error}
+              </div>
+            )}
 
             {offer && (
-              <div className="p-3 mb-3 rounded bg-light border">
-                <div className="fw-semibold text-dark small text-truncate mb-1">{offer.title}</div>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="badge bg-white text-secondary border text-capitalize">{offer.provider}</span>
-                  <span className="fw-bold text-primary">
-                    Current Price: ₹{((offer.priceInPaise || 0) / 100).toLocaleString('en-IN')}
-                  </span>
+              <div
+                className="p-3 mb-4 rounded-3 d-flex align-items-center gap-3"
+                style={{ background: 'var(--pr-mint-bg)', border: '1px solid var(--pr-border)' }}
+              >
+                {offer.imageUrl && (
+                  <div
+                    className="rounded-3 d-flex align-items-center justify-content-center p-2 flex-shrink-0"
+                    style={{ width: '60px', height: '60px', background: 'white' }}
+                  >
+                    <img
+                      src={offer.imageUrl}
+                      alt={offer.title}
+                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                      onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+                <div className="flex-grow-1 overflow-hidden">
+                  <div className="fw-semibold small text-truncate mb-1" style={{ color: 'var(--pr-text-dark)' }}>
+                    {offer.title}
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span
+                      className="badge text-uppercase tracking-wider fw-semibold px-2 py-0.5 rounded-pill"
+                      style={{ background: 'white', color: 'var(--pr-forest)', fontSize: '0.7rem' }}
+                    >
+                      {offer.provider}
+                    </span>
+                    <span className="fw-bold" style={{ color: 'var(--pr-forest)' }}>
+                      Current: ₹{((offer.priceInPaise || 0) / 100).toLocaleString('en-IN')}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
 
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label" htmlFor="alert-type">Alert Condition</label>
+                <label className="form-label small fw-semibold text-muted" htmlFor="alert-type">
+                  ALERT CONDITION
+                </label>
                 <select
                   id="alert-type"
-                  className="form-select"
+                  className="form-select rounded-3 py-2"
                   value={type}
                   onChange={(e) => setType(e.target.value)}
+                  style={{ border: '1px solid var(--pr-border)', color: 'var(--pr-text-dark)' }}
                 >
                   <option value="target_price">Target Price (Notify when price drops to or below ₹X)</option>
                   <option value="fixed_drop">Fixed Drop (Notify when price drops by at least ₹Y)</option>
@@ -158,75 +206,106 @@ export default function AlertFormPage() {
 
               {type === 'target_price' ? (
                 <div className="mb-3">
-                  <label className="form-label" htmlFor="target-price">Target Price in Rupees (₹)</label>
+                  <label className="form-label small fw-semibold text-muted" htmlFor="target-price">
+                    TARGET PRICE (₹)
+                  </label>
                   <input
                     id="target-price"
                     type="number"
                     min="1"
-                    className="form-control"
+                    className="form-control rounded-3 py-2"
                     placeholder="e.g. 15000"
                     required
                     value={targetPrice}
                     onChange={(e) => setTargetPrice(e.target.value)}
+                    style={{ border: '1px solid var(--pr-border)' }}
                   />
                   {offer && typeof offer.priceInPaise === 'number' && Number(targetPrice) >= offer.priceInPaise / 100 && (
-                    <div className="alert alert-info py-2 px-3 mt-2 small mb-0">
-                      ⚡ <strong>Immediate Evaluation:</strong> Target price (₹{Number(targetPrice).toLocaleString('en-IN')}) is at or above the current offer price (₹{(offer.priceInPaise / 100).toLocaleString('en-IN')}). An alert notification will be evaluated and delivered immediately upon saving.
+                    <div
+                      className="p-2.5 mt-2 rounded-3 small"
+                      style={{ background: 'var(--pr-mint-bg)', border: '1px solid var(--pr-border)', color: 'var(--pr-forest)' }}
+                    >
+                      ⚡ <strong>Immediate Evaluation:</strong> Target price (₹{Number(targetPrice).toLocaleString('en-IN')}) is at or above the current offer price (₹{(offer.priceInPaise / 100).toLocaleString('en-IN')}). An alert notification will trigger and deliver immediately upon saving.
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="mb-3">
-                  <label className="form-label" htmlFor="drop-amount">Price Drop in Rupees (₹)</label>
+                  <label className="form-label small fw-semibold text-muted" htmlFor="drop-amount">
+                    PRICE DROP AMOUNT (₹)
+                  </label>
                   <input
                     id="drop-amount"
                     type="number"
                     min="1"
-                    className="form-control"
+                    className="form-control rounded-3 py-2"
                     placeholder="e.g. 1000"
                     required
                     value={dropAmount}
                     onChange={(e) => setDropAmount(e.target.value)}
+                    style={{ border: '1px solid var(--pr-border)' }}
                   />
                 </div>
               )}
 
-              <div className="mb-3">
-                <label className="form-label d-block">Notification Channels</label>
-                <div className="form-check form-check-inline">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="channel-email"
-                    checked={channels.includes('email')}
-                    onChange={() => toggleChannel('email')}
-                  />
-                  <label className="form-check-label" htmlFor="channel-email">Email</label>
-                </div>
-                <div className="form-check form-check-inline">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="channel-telegram"
-                    checked={channels.includes('telegram')}
-                    disabled={!telegramLinked}
-                    onChange={() => toggleChannel('telegram')}
-                  />
-                  <label className="form-check-label" htmlFor="channel-telegram">
-                    Telegram
-                    {!telegramLinked && (
-                      <span className="text-muted ms-2 small">
-                        (Not linked — <Link to="/settings/notifications">connect Telegram first</Link>)
-                      </span>
-                    )}
+              <div className="mb-4">
+                <label className="form-label small fw-semibold text-muted d-block mb-2">
+                  DELIVERY CHANNELS
+                </label>
+                <div className="d-flex flex-wrap gap-3">
+                  <label
+                    className="d-flex align-items-center gap-2 p-2.5 rounded-3 border flex-grow-1 cursor-pointer"
+                    style={{
+                      background: channels.includes('email') ? 'var(--pr-mint-bg)' : '#FFFFFF',
+                      borderColor: channels.includes('email') ? 'var(--pr-forest)' : 'var(--pr-border)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="channel-email"
+                      checked={channels.includes('email')}
+                      onChange={() => toggleChannel('email')}
+                      style={{ accentColor: 'var(--pr-forest)' }}
+                    />
+                    <span className="small fw-semibold" style={{ color: 'var(--pr-text-dark)' }}>
+                      📧 Email
+                    </span>
+                  </label>
+
+                  <label
+                    className="d-flex align-items-center gap-2 p-2.5 rounded-3 border flex-grow-1 cursor-pointer"
+                    style={{
+                      background: channels.includes('telegram') ? 'var(--pr-mint-bg)' : '#FFFFFF',
+                      borderColor: channels.includes('telegram') ? 'var(--pr-forest)' : 'var(--pr-border)',
+                      cursor: telegramLinked ? 'pointer' : 'not-allowed',
+                      opacity: telegramLinked ? 1 : 0.6,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="channel-telegram"
+                      checked={channels.includes('telegram')}
+                      disabled={!telegramLinked}
+                      onChange={() => toggleChannel('telegram')}
+                      style={{ accentColor: 'var(--pr-forest)' }}
+                    />
+                    <span className="small fw-semibold" style={{ color: 'var(--pr-text-dark)' }}>
+                      ✈️ Telegram
+                    </span>
                   </label>
                 </div>
+                {!telegramLinked && (
+                  <div className="text-muted small mt-2">
+                    Telegram is not connected yet. You can <Link to="/settings/notifications" style={{ color: 'var(--pr-forest)' }}>link your bot in Settings</Link>.
+                  </div>
+                )}
               </div>
 
-              <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+              <button type="submit" className="btn btn-pr-primary w-100 py-2.5" disabled={loading}>
                 {loading
                   ? (isEditMode ? 'Updating alert…' : 'Creating alert…')
-                  : (isEditMode ? 'Update Alert' : 'Create Alert')}
+                  : (isEditMode ? 'Update Alert →' : 'Create Alert →')}
               </button>
             </form>
           </div>
