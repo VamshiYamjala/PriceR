@@ -226,9 +226,14 @@ export default function DashboardPage() {
           <div className="card border-0 shadow-sm p-3 bg-white">
             <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
               <h2 className="h6 mb-0 fw-bold">Configured Price Alerts</h2>
-              <Link to="/alerts" className="btn btn-sm btn-link text-decoration-none">
-                Manage alerts ({alerts.length}) →
-              </Link>
+              <div className="d-flex gap-2">
+                <Link to="/notifications" className="btn btn-sm btn-link text-decoration-none">
+                  Delivery Log →
+                </Link>
+                <Link to="/alerts" className="btn btn-sm btn-link text-decoration-none">
+                  Manage ({alerts.length}) →
+                </Link>
+              </div>
             </div>
 
             {loading ? (
@@ -249,19 +254,24 @@ export default function DashboardPage() {
                     key={alert.id}
                     className="d-flex justify-content-between align-items-center p-2 rounded bg-light border-0"
                   >
-                    <div>
-                      <span className="badge bg-primary text-white me-2 small text-uppercase">
-                        {alert.type === 'target_price' ? 'Target Price' : 'Fixed Drop'}
-                      </span>
-                      <span className="small text-muted">
+                    <div className="text-truncate me-2" style={{ maxWidth: '65%' }}>
+                      <div className="fw-semibold text-dark small text-truncate">
+                        {alert.offer?.title || `Alert Rule (${alert.id.substring(0, 8)})`}
+                      </div>
+                      <div className="small text-muted">
+                        <span className="badge bg-primary text-white me-1 small text-uppercase" style={{ fontSize: '0.7rem' }}>
+                          {alert.type === 'target_price' ? 'Target' : 'Drop'}
+                        </span>
                         {alert.type === 'target_price'
-                          ? `≤ ₹${(alert.targetPriceInPaise / 100).toLocaleString('en-IN')}`
-                          : `Drop ≥ ₹${(alert.dropAmountInPaise / 100).toLocaleString('en-IN')}`}
+                          ? `≤ ₹${((alert.targetPriceInPaise || 0) / 100).toLocaleString('en-IN')}`
+                          : `≥ ₹${((alert.dropAmountInPaise || 0) / 100).toLocaleString('en-IN')}`}
+                      </div>
+                    </div>
+                    <div className="text-end">
+                      <span className={`badge ${alert.armed ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'} small`}>
+                        {alert.armed ? 'Armed' : 'Triggered'}
                       </span>
                     </div>
-                    <span className={`badge ${alert.armed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'} small`}>
-                      {alert.armed ? 'Armed' : 'Triggered'}
-                    </span>
                   </div>
                 ))}
               </div>

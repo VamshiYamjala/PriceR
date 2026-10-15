@@ -93,6 +93,9 @@ export default function AlertManagementPage() {
               </>
             )}
           </button>
+          <Link to="/notifications" className="btn btn-outline-secondary btn-sm">
+            📜 Delivery Log
+          </Link>
           <Link to="/watchlist" className="btn btn-primary btn-sm">
             + New Alert
           </Link>
@@ -146,17 +149,27 @@ export default function AlertManagementPage() {
                         ? ((alert.targetPriceInPaise || 0) / 100).toLocaleString('en-IN')
                         : ((alert.dropAmountInPaise || 0) / 100).toLocaleString('en-IN')}
                     </span>
+                    {alert.offer?.priceInPaise && (
+                      <span className="ms-2">
+                        (Current: ₹{((alert.offer.priceInPaise) / 100).toLocaleString('en-IN')})
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <span className={`badge ${alert.status === 'active' ? 'bg-success' : 'bg-secondary'} me-2`}>
+                  <div className="d-flex flex-wrap align-items-center gap-1">
+                    <span className={`badge ${alert.status === 'active' ? 'bg-success' : 'bg-secondary'} me-1`}>
                       {alert.status}
                     </span>
-                    <span className={`badge ${alert.armed ? 'bg-info text-dark' : 'bg-warning text-dark'} me-2`}>
-                      {alert.armed ? 'Armed' : 'Disarmed (Notified)'}
+                    <span className={`badge ${alert.armed ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'} me-1`}>
+                      {alert.armed ? 'Armed' : 'Triggered'}
                     </span>
-                    <span className="badge bg-light text-dark border">
+                    <span className="badge bg-light text-dark border me-1">
                       Channels: {(alert.channels || []).join(', ')}
                     </span>
+                    {alert.lastTriggeredAt && (
+                      <span className="small text-muted">
+                        Last fired: {new Date(alert.lastTriggeredAt).toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="d-flex gap-2">
