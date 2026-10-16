@@ -89,4 +89,35 @@ describe('Products & Search API (Connected Database)', () => {
     expect(res.statusCode).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
+
+  it('GET /api/products/autocomplete should return debounced suggestions', async () => {
+    const res = await request(app).get('/api/products/autocomplete?q=Sam');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.suggestions)).toBe(true);
+    if (res.body.data.suggestions.length > 0) {
+      const s = res.body.data.suggestions[0];
+      expect(s).toHaveProperty('id');
+      expect(s).toHaveProperty('title');
+    }
+  });
+
+  it('GET /api/products/categories should return all supported category filters', async () => {
+    const res = await request(app).get('/api/products/categories');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.categories)).toBe(true);
+    expect(res.body.data.categories).toContain('audio');
+    expect(res.body.data.categories).toContain('laptops');
+    expect(res.body.data.categories).toContain('smartphones');
+  });
+
+  it('GET /api/products/search with unmatched query should return alternatives without crashing', async () => {
+    const res = await request(app).get('/api/products/search?q=NonExistentProductZ999X');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.products)).toBe(true);
+    expect(res.body.data.products.length).toBe(0);
+    expect(Array.isArray(res.body.data.alternatives)).toBe(true);
+  });
 });

@@ -26,6 +26,26 @@ export const listNotifications = asyncHandler(async (req, res) => {
   });
 });
 
+export const deleteNotification = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const event = await NotificationEvent.findOneAndDelete({
+    _id: id,
+    userId: req.user.id,
+  });
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Notification event not found.' },
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: { id: event._id.toString() },
+  });
+});
+
 export const getNotificationPreferences = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) {

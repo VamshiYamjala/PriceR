@@ -4,18 +4,33 @@ import * as api from '../services/api';
 
 export default function ProductCard({ product, onOpen }) {
   const { isAuthenticated } = useAuth();
-  const { title, brand, model, category, imageUrl, dataStatus, offers = [] } = product;
+  const {
+    title = '',
+    brand = '',
+    model = '',
+    category = '',
+    imageUrl = null,
+    dataStatus = '',
+    offers = [],
+  } = product || {};
 
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
-  const isSample = dataStatus === 'sample' || product.isSample;
+  const isSample = (dataStatus === 'sample' || product?.isSample) && !product?.isAlternative;
+  const isAlternative = Boolean(product?.isAlternative);
 
-  // Compute lowest active price
-  const validOffers = offers.filter((o) => o.availability !== 'out_of_stock' && o.lastStatus !== 'error');
+  // Compute lowest active price FIRST before referencing it
+  const validOffers = Array.isArray(offers)
+    ? offers.filter((o) => o && o.availability !== 'out_of_stock' && o.lastStatus !== 'error')
+    : [];
   const lowestOffer = validOffers.length > 0
     ? validOffers.reduce((min, o) => (o.priceInPaise < min.priceInPaise ? o : min))
-    : offers[0] || null;
+    : (offers && offers[0]) || null;
+
+  const retailerName = lowestOffer?.retailer
+    ? (lowestOffer.retailer.charAt(0).toUpperCase() + lowestOffer.retailer.slice(1))
+    : (lowestOffer?.provider === 'fixture' ? 'Amazon' : lowestOffer?.provider || 'Retailer');
 
   const displayPrice = lowestOffer?.priceInPaise
     ? `₹${(lowestOffer.priceInPaise / 100).toLocaleString('en-IN')}`
@@ -55,12 +70,20 @@ export default function ProductCard({ product, onOpen }) {
         className="product-image-container"
         style={{ height: '210px', backgroundColor: 'var(--pr-image-bg)' }}
       >
-        {/* Sample / Live Provenance Tag */}
-        <div className="position-absolute top-0 start-0 m-3 z-1">
-          {isSample ? (
+        {/* Sample / Live / Store / Alternative Provenance Tag */}
+        <div className="position-absolute top-0 start-0 m-3 z-1 d-flex flex-column gap-1">
+          {isAlternative ? (
+            <span className="badge rounded-pill bg-warning-subtle text-warning-emphasis px-2 py-1 shadow-sm" style={{ fontSize: '0.72rem' }}>
+              ✦ Similar Alternative
+            </span>
+          ) : offers.length > 1 ? (
+            <span className="badge rounded-pill bg-success-subtle text-success-emphasis px-2 py-1 shadow-sm" style={{ fontSize: '0.72rem' }}>
+              ⚖️ Compares {offers.length} stores
+            </span>
+          ) : isSample ? (
             <span className="badge-sample-tag">Sample product</span>
           ) : (
-            <span className="badge-live-tag">● Live Retailer</span>
+            <span className="badge-live-tag">● {retailerName} Live</span>
           )}
         </div>
 
@@ -148,6 +171,30 @@ export default function ProductCard({ product, onOpen }) {
           >
             {[brand, model].filter(Boolean).join(' · ') || (offers.length > 1 ? `${offers.length} retailer stores` : 'Verified product')}
           </p>
+
+          {offers.length > 1 && (
+            <div className="d-flex flex-wrap gap-1 mb-2">
+              {offers.slice(0, 3).map((o, idx) => {
+                const retLabel = (o.retailer || o.provider || 'Store').toUpperCase();
+                const isLowestMatch = o.id === lowestOffer?.id;
+                return (
+                  <span
+                    key={o.id || idx}
+                    className="badge px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: isLowestMatch ? 'var(--pr-mint-bg)' : '#F1F3F0',
+                      color: isLowestMatch ? 'var(--pr-forest)' : '#5C6A62',
+                      border: isLowestMatch ? '1px solid #C8DEC3' : '1px solid var(--pr-border)',
+                      fontSize: '0.68rem',
+                      fontWeight: isLowestMatch ? '600' : '500',
+                    }}
+                  >
+                    {retLabel}: ₹{(o.priceInPaise / 100).toLocaleString('en-IN')}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Divider & Pricing Footer */}

@@ -32,8 +32,20 @@ function unwrap(responsePromise) {
 }
 
 // =========================================================================
-// Auth — Document 1 Section 6.1
+// Auth — Document 1 Section 6.1 & Registration OTP flow
 // =========================================================================
+export function initiateRegistration({ name, email, password }) {
+  return unwrap(api.post('/api/auth/register/initiate', { name, email, password }));
+}
+
+export function verifyRegistration({ email, otp }) {
+  return unwrap(api.post('/api/auth/register/verify', { email, otp }));
+}
+
+export function resendRegistrationOtp({ email }) {
+  return unwrap(api.post('/api/auth/register/resend', { email }));
+}
+
 export function register({ name, email, password }) {
   return unwrap(api.post('/api/auth/register', { name, email, password }));
 }
@@ -60,6 +72,10 @@ export function getProduct(productId) {
 
 export function getCategories() {
   return unwrap(api.get('/api/products/categories'));
+}
+
+export function getProductAutocomplete(q) {
+  return unwrap(api.get('/api/products/autocomplete', { params: { q } }));
 }
 
 export function getProviderStatus() {
@@ -121,6 +137,10 @@ export function deleteAlert(alertId) {
 // =========================================================================
 export function getNotifications() {
   return unwrap(api.get('/api/notifications'));
+}
+
+export function deleteNotification(notificationId) {
+  return unwrap(api.delete(`/api/notifications/${notificationId}`));
 }
 
 export function getNotificationPreferences() {

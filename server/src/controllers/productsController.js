@@ -7,9 +7,16 @@ import * as mockshopProvider from '../providers/mockshop.js';
 import * as apifyProvider from '../providers/apify.js';
 
 function toOfferSummary(offer) {
+  const rawRetailer = offer.retailer || (
+    offer.provider === 'apify'
+      ? (offer.externalProductId?.startsWith('flipkart') ? 'flipkart' : offer.externalProductId?.startsWith('meesho') ? 'meesho' : 'amazon')
+      : (offer.provider === 'fixture' ? 'amazon' : offer.provider)
+  );
+
   return {
     id: offer._id ? offer._id.toString() : offer.id,
     provider: offer.provider,
+    retailer: rawRetailer,
     title: offer.title,
     priceInPaise: offer.priceInPaise,
     originalPrice: offer.originalPrice ?? null,
@@ -24,6 +31,15 @@ function toOfferSummary(offer) {
   };
 }
 
+const CATEGORY_MAP = {
+  audio: /audio|headphone|earphone|earbuds|speaker|soundbar|airpods/i,
+  laptops: /laptop|notebook|macbook|chromebook|thinkpad/i,
+  cameras: /camera|dslr|lens|mirrorless|camcorder/i,
+  smartphones: /phone|smartphone|mobile|iphone|galaxy|pixel|oneplus|redmi/i,
+  wearables: /watch|smartwatch|band|fitness|tracker/i,
+  electronics: /electronics|gadget|tablet|ipad|monitor/i,
+};
+
 export const searchProducts = asyncHandler(async (req, res) => {
   const q = (req.query.q || '').trim();
   const category = (req.query.category || '').trim();
@@ -31,23 +47,32 @@ export const searchProducts = asyncHandler(async (req, res) => {
 
   // If query is completely empty and no category is requested, return empty list
   if (!q && !category) {
-    return res.status(200).json({ success: true, data: { products: [] } });
+    return res.status(200).json({ success: true, data: { products: [], alternatives: [] } });
   }
 
   let dbProducts = [];
 
   // 1. Search local DB (fixtures and stored products) unless filtered out
-  if (providerFilter === 'all' || providerFilter === 'fixture') {
+  if (providerFilter === 'all' || providerFilter === 'fixture' || providerFilter === 'live') {
     const dbQuery = {};
     if (q) {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       dbQuery.$or = [{ title: regex }, { brand: regex }, { model: regex }];
     }
     if (category && category !== 'all') {
-      dbQuery.category = new RegExp(`^${category}$`, 'i');
+      const catRegex = CATEGORY_MAP[category.toLowerCase()] || new RegExp(`^${category}$`, 'i');
+      if (dbQuery.$or) {
+        dbQuery.$and = [
+          { $or: dbQuery.$or },
+          { $or: [{ category: catRegex }, { title: catRegex }] },
+        ];
+        delete dbQuery.$or;
+      } else {
+        dbQuery.$or = [{ category: catRegex }, { title: catRegex }];
+      }
     }
 
-    dbProducts = await Product.find(dbQuery).limit(20);
+    dbProducts = await Product.find(dbQuery).limit(30);
   }
 
   const productIds = dbProducts.map((p) => p._id);
@@ -81,7 +106,14 @@ export const searchProducts = asyncHandler(async (req, res) => {
     providerFilter === 'live' ||
     ['amazon', 'flipkart', 'meesho'].includes(providerFilter);
 
-  if (isApifyTargeted && q && Product.db?.readyState === 1) {
+  const effectiveApifyQuery = q || (category && category !== 'all' ? (
+    category === 'audio' ? 'wireless headphones' :
+    category === 'laptops' ? 'laptop' :
+    category === 'cameras' ? 'camera' :
+    category === 'smartphones' ? 'smartphone' : category
+  ) : '');
+
+  if (isApifyTargeted && effectiveApifyQuery && Product.db?.readyState === 1) {
     const apifyConfig = apifyProvider.getApifyConfig();
     if (apifyConfig.isConfigured) {
       try {
@@ -90,7 +122,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
         else if (providerFilter === 'meesho') retailer = 'meesho';
         else if (req.query.retailer) retailer = req.query.retailer.toLowerCase();
 
-        const apifyRes = await apifyProvider.searchProducts(q, {
+        const apifyRes = await apifyProvider.searchProducts(effectiveApifyQuery, {
           retailer,
           limit: apifyConfig.maxItems,
         });
@@ -108,7 +140,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
                   brand: item.brand,
                   model: item.model,
                   variant: item.variant,
-                  category: item.category || 'general',
+                  category: item.category || (category && category !== 'all' ? category : 'electronics'),
                   description: item.description,
                   imageUrl: item.imageUrl,
                   sourceProvider: 'apify',
@@ -125,6 +157,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
                   { provider: 'apify', externalProductId: String(offerData.externalProductId) },
                   {
                     productId: persistedProduct._id,
+                    retailer: item.sourceProvider || retailer,
                     title: offerData.title || item.title,
                     productUrl: offerData.productUrl || item.sourceUrl,
                     priceInPaise: offerData.priceInPaise,
@@ -158,8 +191,13 @@ export const searchProducts = asyncHandler(async (req, res) => {
     }
   }
 
-  // 3. Query DummyJSON external catalog for discovery (unless filtered to fixture or live only)
-  if (providerFilter === 'all' || providerFilter === 'dummyjson' || providerFilter === 'sample') {
+  // 3. Query DummyJSON external catalog for discovery ONLY when explicitly requested or in test mode
+  const shouldQueryDummyJson =
+    providerFilter === 'dummyjson' ||
+    providerFilter === 'sample' ||
+    (process.env.NODE_ENV === 'test' && providerFilter === 'all');
+
+  if (shouldQueryDummyJson) {
     try {
       const dummyRes = await dummyjsonProvider.searchProducts(q, { limit: 12 });
       if (dummyRes && Array.isArray(dummyRes.products)) {
@@ -199,6 +237,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
                 { provider: 'dummyjson', externalProductId: String(offerData.externalProductId) },
                 {
                   productId: persistedProduct._id,
+                  retailer: 'dummyjson',
                   title: offerData.title || item.title,
                   productUrl: offerData.productUrl || item.sourceUrl,
                   priceInPaise: offerData.priceInPaise,
@@ -230,7 +269,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
     }
   }
 
-  // 3. Query mock.shop optional storefront if requested or matching apparel
+  // 4. Query mock.shop optional storefront if requested or matching apparel
   if (providerFilter === 'mockshop') {
     try {
       const mockRes = await mockshopProvider.searchProducts(q, { limit: 6 });
@@ -262,6 +301,7 @@ export const searchProducts = asyncHandler(async (req, res) => {
                 { provider: 'mockshop', externalProductId: String(offerData.externalProductId) },
                 {
                   productId: persistedProduct._id,
+                  retailer: 'mockshop',
                   title: offerData.title || item.title,
                   productUrl: offerData.productUrl || item.sourceUrl,
                   priceInPaise: offerData.priceInPaise,
@@ -291,7 +331,51 @@ export const searchProducts = asyncHandler(async (req, res) => {
     }
   }
 
-  return res.status(200).json({ success: true, data: { products: combined } });
+  // 5. Similar / Alternative products fallback when 0 exact products are found
+  let alternatives = [];
+  if (combined.length === 0 && (q || category)) {
+    try {
+      const altCatRegex = category && CATEGORY_MAP[category.toLowerCase()]
+        ? CATEGORY_MAP[category.toLowerCase()]
+        : /electronics|smartphone|laptop|audio|headphones/i;
+
+      const altProducts = await Product.find({
+        $or: [{ category: altCatRegex }, { title: altCatRegex }],
+      }).limit(6);
+
+      const altIds = altProducts.map((p) => p._id);
+      const altOffers = await Offer.find({ productId: { $in: altIds } });
+      const altOffersMap = new Map();
+      for (const o of altOffers) {
+        const k = o.productId.toString();
+        if (!altOffersMap.has(k)) altOffersMap.set(k, []);
+        altOffersMap.get(k).push(toOfferSummary(o));
+      }
+
+      alternatives = altProducts.map((p) => ({
+        id: p._id.toString(),
+        title: p.title,
+        brand: p.brand ?? null,
+        model: p.model ?? null,
+        variant: p.variant ?? null,
+        category: p.category ?? 'electronics',
+        description: p.description ?? '',
+        imageUrl: p.imageUrl ?? null,
+        sourceProvider: p.sourceProvider || 'fixture',
+        dataStatus: p.dataStatus || 'sample',
+        isAlternative: true,
+        offers: altOffersMap.get(p._id.toString()) ?? [],
+      }));
+    } catch (_) {}
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      products: combined,
+      alternatives,
+    },
+  });
 });
 
 export const getProductById = asyncHandler(async (req, res) => {
@@ -387,10 +471,48 @@ export const getProductById = asyncHandler(async (req, res) => {
   });
 });
 
+export const getAutocomplete = asyncHandler(async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) {
+    return res.status(200).json({ success: true, data: { suggestions: [] } });
+  }
+
+  const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const products = await Product.find({
+    $or: [{ title: regex }, { brand: regex }, { model: regex }],
+  })
+    .limit(8)
+    .select('_id title brand model category imageUrl sourceProvider');
+
+  const productIds = products.map((p) => p._id);
+  const offers = await Offer.find({ productId: { $in: productIds } }).select('productId priceInPaise');
+  const priceMap = new Map();
+  for (const o of offers) {
+    const key = o.productId.toString();
+    if (!priceMap.has(key) || o.priceInPaise < priceMap.get(key)) {
+      priceMap.set(key, o.priceInPaise);
+    }
+  }
+
+  const suggestions = products.map((p) => ({
+    id: p._id.toString(),
+    title: p.title,
+    brand: p.brand || null,
+    category: p.category || 'electronics',
+    imageUrl: p.imageUrl || null,
+    minPriceInPaise: priceMap.get(p._id.toString()) || null,
+  }));
+
+  return res.status(200).json({ success: true, data: { suggestions } });
+});
+
 export const getCategories = asyncHandler(async (req, res) => {
-  const dummyCategories = await dummyjsonProvider.getCategories();
-  const localCategories = ['smartphones', 'audio', 'wearables', 'electronics'];
-  const merged = Array.from(new Set([...localCategories, ...dummyCategories])).sort();
+  const coreCategories = ['audio', 'laptops', 'cameras', 'smartphones', 'wearables', 'electronics'];
+  let dummyCategories = [];
+  try {
+    dummyCategories = await dummyjsonProvider.getCategories();
+  } catch (_) {}
+  const merged = Array.from(new Set([...coreCategories, ...dummyCategories])).sort();
 
   return res.status(200).json({
     success: true,
@@ -476,5 +598,6 @@ export default {
   searchProducts,
   getProductById,
   getCategories,
+  getAutocomplete,
   getProviderStatus,
 };

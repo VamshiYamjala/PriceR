@@ -8,6 +8,9 @@ export default function NotificationHistoryPage() {
   const { isAuthenticated } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [actionMessage, setActionMessage] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -26,6 +29,21 @@ export default function NotificationHistoryPage() {
     }
     loadNotifications();
   }, [isAuthenticated]);
+
+  async function handleDelete(id) {
+    setDeletingId(id);
+    try {
+      await api.deleteNotification(id);
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      setActionMessage('Notification record deleted successfully.');
+      setConfirmDeleteId(null);
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err) {
+      alert(err.response?.data?.error?.message || 'Failed to delete notification record.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function maskRecipient(recipient, channel) {
     if (!recipient) return '—';
@@ -73,6 +91,18 @@ export default function NotificationHistoryPage() {
 
         {/* Delivery Log Content */}
         <div className="col-12 col-lg-9">
+          {actionMessage && (
+            <div className="alert alert-success alert-dismissible fade show py-2 px-3 small rounded-3 mb-3" role="alert">
+              <span>✓ {actionMessage}</span>
+              <button
+                type="button"
+                className="btn-close py-2"
+                aria-label="Close"
+                onClick={() => setActionMessage(null)}
+              />
+            </div>
+          )}
+
           {!isAuthenticated ? (
             <div
               className="p-5 text-center rounded-4 bg-white"
@@ -144,6 +174,7 @@ export default function NotificationHistoryPage() {
                       <th className="py-2.5 text-muted small fw-semibold">Recipient</th>
                       <th className="py-2.5 text-muted small fw-semibold">Delivery Status</th>
                       <th className="py-2.5 text-muted small fw-semibold">Alert Details</th>
+                      <th className="py-2.5 pe-3 text-end text-muted small fw-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody className="small">
@@ -201,9 +232,42 @@ export default function NotificationHistoryPage() {
                           )}
                         </td>
                         <td>
-                          <div className="fw-medium text-wrap" style={{ maxWidth: '340px', color: 'var(--pr-text-dark)', fontSize: '0.82rem' }}>
+                          <div className="fw-medium text-wrap" style={{ maxWidth: '300px', color: 'var(--pr-text-dark)', fontSize: '0.82rem' }}>
                             {evt.message}
                           </div>
+                        </td>
+                        <td className="pe-3 text-end text-nowrap">
+                          {confirmDeleteId === evt.id ? (
+                            <div className="d-inline-flex align-items-center gap-1">
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm py-0.5 px-2"
+                                style={{ fontSize: '0.72rem' }}
+                                disabled={deletingId === evt.id}
+                                onClick={() => handleDelete(evt.id)}
+                              >
+                                {deletingId === evt.id ? '…' : 'Delete'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-light btn-sm py-0.5 px-2"
+                                style={{ fontSize: '0.72rem', border: '1px solid var(--pr-border)' }}
+                                onClick={() => setConfirmDeleteId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger btn-sm py-0.5 px-2"
+                              style={{ fontSize: '0.72rem', borderRadius: '6px' }}
+                              title="Delete notification log"
+                              onClick={() => setConfirmDeleteId(evt.id)}
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

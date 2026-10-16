@@ -125,4 +125,48 @@ export async function sendEmail({ to, subject, text, html }) {
   }
 }
 
-export default { sendEmail, getEmailConfigStatus };
+/**
+ * Sends a 6-digit OTP verification email via Brevo.
+ * @param {object} params
+ * @param {string} params.to - recipient email
+ * @param {string} params.otpCode - 6 digit numeric code
+ * @param {string} [params.name] - recipient name
+ * @param {string} [params.purpose] - verification purpose (e.g. 'Account Registration')
+ */
+export async function sendOtpEmail({ to, otpCode, name, purpose = 'Account Registration' }) {
+  const recipientName = name ? name.trim() : 'Shopper';
+  const subject = `Your PriceRadar Verification Code: ${otpCode}`;
+  const text = `Hello ${recipientName},\n\nYour PriceRadar verification code for ${purpose} is: ${otpCode}\n\nThis code is valid for 10 minutes. If you did not request this verification code, please ignore this email.\n\n— The PriceRadar Team`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #E2E1DB; border-radius: 12px; background-color: #FAFBF8;">
+      <div style="border-bottom: 2px solid #183C2B; padding-bottom: 16px; margin-bottom: 24px;">
+        <h2 style="color: #183C2B; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">PriceRadar</h2>
+      </div>
+      <div style="background-color: #FFFFFF; border: 1px solid #E2E1DB; border-radius: 10px; padding: 24px; margin-bottom: 24px;">
+        <h3 style="color: #17211B; font-size: 18px; margin-top: 0; margin-bottom: 12px;">Verify your email address</h3>
+        <p style="font-size: 15px; color: #526058; line-height: 1.6; margin-bottom: 20px;">
+          Hi ${recipientName}, please use the 6-digit code below to complete your PriceRadar ${purpose}.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <div style="display: inline-block; background-color: #EAF2E6; border: 2px dashed #183C2B; border-radius: 8px; padding: 16px 36px;">
+            <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #183C2B;">
+              ${otpCode}
+            </span>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #526058; line-height: 1.5; margin-bottom: 0;">
+          ⏳ This verification code expires in <strong>10 minutes</strong>. Never share this code with anyone.
+        </p>
+      </div>
+      <div style="border-top: 1px solid #E2E1DB; padding-top: 16px; font-size: 12px; color: #738279; text-align: center;">
+        <p style="margin: 0 0 6px 0;">PriceRadar — Real-time ecommerce price tracking and instant drop alerts.</p>
+        <p style="margin: 0;">If you didn't request this code, you can safely ignore this email.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({ to, subject, text, html });
+}
+
+export default { sendEmail, sendOtpEmail, getEmailConfigStatus };

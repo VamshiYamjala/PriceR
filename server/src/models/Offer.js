@@ -13,6 +13,11 @@ const offerSchema = new mongoose.Schema(
       enum: ['flipkart', 'amazon', 'dummyjson', 'mockshop', 'ebay', 'fixture', 'scrapling', 'apify'],
       required: true,
     },
+    retailer: {
+      type: String,
+      required: false,
+      enum: ['amazon', 'flipkart', 'meesho', 'ebay', 'fixture', 'dummyjson', 'mockshop', 'unknown'],
+    },
     externalProductId: {
       type: String,
       required: true,

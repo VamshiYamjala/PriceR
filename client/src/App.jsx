@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
@@ -20,7 +21,8 @@ export default function App() {
     <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: 'var(--pr-bg-soft)' }}>
       <Navbar />
       <main className="flex-grow-1">
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/products/:productId" element={<ProductDetailPage />} />
@@ -84,6 +86,7 @@ export default function App() {
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>

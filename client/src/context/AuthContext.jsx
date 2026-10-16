@@ -42,6 +42,10 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const setAuthSession = useCallback((nextToken, nextUser) => {
+    persist(nextToken, nextUser);
+  }, []);
+
   const logout = useCallback(() => {
     persist(null, null);
   }, []);
@@ -52,6 +56,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(token),
     login,
     register,
+    setAuthSession,
     logout,
   };
 

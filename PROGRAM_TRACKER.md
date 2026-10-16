@@ -814,7 +814,46 @@ PriceRadar/
   - Jest Test Suites: 19/19 passed, 195/195 tests green.
   - Vite client production build: 107 modules compiled in 897ms with 0 errors.
   - Controlled price alert dispatch accepted by Brevo REST API with provider message ID.
-- **Next Task:** Verification complete. Provide comprehensive 9-point report to user.
+- **Next Task:** Task 15: Blank Search Page Fix, Apify New Token & Account Verification, and Controlled Live Search.
+
+---
+
+### Task 15: Blank Search Page Fix, Apify New Token & Account Verification, and Controlled Live Search
+- **Date & Time:** 2026-10-16 22:05 IST
+- **Phase:** Bug Fix & Multi-Retailer Search Integrity Verification
+- **Files Modified:**
+  - `client/src/components/ProductCard.jsx` (Fixed `lowestOffer` Temporal Dead Zone ReferenceError and added defensive property destructuring)
+  - `client/src/components/ErrorBoundary.jsx` (Created application error boundary preventing full-page unmounting)
+  - `client/src/App.jsx` (Wrapped `<Routes>` in `<ErrorBoundary>`)
+  - `client/src/pages/SearchPage.jsx` (Enhanced with debounced autocomplete, category discovery chips, and similar alternatives fallback)
+  - `server/src/controllers/productsController.js` (Implemented category mapping, autocomplete endpoint, multi-retailer live data formatting, and alternative products fallback)
+  - `server/src/routes/products.js` (Mounted `/api/products/autocomplete`)
+  - `server/tests/products.test.js` (Added regression tests for autocomplete, categories, and alternatives fallback)
+  - `ERROR_LOG.md` (Documented ERR-010)
+  - `PROGRAM_TRACKER.md` (Updated development ledger)
+- **What Changed:**
+  - Diagnosed blank white screen on `/search?q=samsung`: In `ProductCard.jsx`, `retailerName` evaluated `lowestOffer?.retailer` before `lowestOffer` was declared with `const`, throwing an uncaught `ReferenceError: Cannot access 'lowestOffer' before initialization` which unmounted the entire React component tree.
+  - Reordered variable declarations in `ProductCard.jsx` so `validOffers` and `lowestOffer` are computed first before `retailerName` and `displayPrice`.
+  - Added `ErrorBoundary.jsx` around the routes to ensure unexpected component errors never collapse the navigation or render a completely blank application.
+  - Independently verified the new Apify account credentials: user `verdant_observatory` (`nagavamshi2012@gmail.com`), active Free plan with full $5.00 usage credits available ($0.00 consumed), and confirmed access permissions to all three configured Actors (`junglee/free-amazon-product-scraper`, `shahidirfan/Flipkart-Product-Scraper`, `scrapeai/meesho-product-scraper`).
+  - Restarted the backend server process on port 5000 to ensure the new Apify configuration is active in process memory.
+  - Executed a controlled live search for `samsung`: successfully returned genuine live products from Amazon India and Flipkart with integer paise pricing, valid URLs, and active retailer badges, all persisted cleanly into MongoDB Atlas.
+  - Verified backend test suite (20/20 test suites, 203/203 tests passing) and Vite client production build (compiled cleanly in 970ms).
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server run apify:verify
+  curl.exe -s http://localhost:5000/api/health
+  curl.exe -s "http://localhost:5000/api/products/search?q=samsung&provider=live&retailer=amazon"
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 20/20 passed, 203/203 tests green.
+  - Vite client production build: 111 modules compiled in 970ms with 0 errors.
+  - Health check: `{"status":"ok","database":"connected"}`.
+  - Apify diagnostic: ONLINE & VALID, 100% credit available.
+  - Controlled live search: Succeeded with live products from Amazon and Flipkart.
+- **Next Task:** Verification complete. Deliver comprehensive final report.
 
 
 

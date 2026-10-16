@@ -264,9 +264,42 @@ Whenever an error occurs during development:
   - `client/src/pages/NotificationHistoryPage.jsx`
   - `server/tests/emailService.test.js`
   - `server/tests/notificationFlow.test.js`
-- **Prevention Steps:**
-  - Always restart running server processes or invoke dynamic configuration reloaders upon modifying `.env` secrets.
-  - Distinguish third-party provider acceptance (`messageId`) from end-user inbox confirmation in notification logs.
 - **Related Errors:** ERR-007.
 
+---
 
+### ERR-010: Completely Blank Search Page Caused by Temporal Dead Zone ReferenceError in ProductCard
+- **Date & Time:** 2026-10-16 22:00 IST
+- **Phase / Feature:** Phase 2 — Blank Search Page Diagnosis & Product Card Rendering
+- **Status:** VERIFIED
+- **Exact Error Message:**
+  ```text
+  ReferenceError: Cannot access 'lowestOffer' before initialization in ProductCard.jsx
+  ```
+- **Relevant Command / File:** `client/src/components/ProductCard.jsx`, `client/src/pages/SearchPage.jsx`, `client/src/App.jsx`
+- **Root Cause:**
+  In `client/src/components/ProductCard.jsx`, line 15 evaluated `const retailerName = lowestOffer?.retailer ...` prior to `lowestOffer` being declared on line 21. Because `lowestOffer` was declared with `const`, JavaScript placed it in the Temporal Dead Zone (TDZ). When `SearchPage.jsx` received product search results (e.g. for query `samsung`) and rendered `<ProductCard>`, the component threw an uncaught `ReferenceError`. Because the React router had no top-level `<ErrorBoundary>`, the uncaught exception unmounted the entire React component tree, rendering the screen completely blank white and hiding the navigation, search input, and results.
+- **Diagnostic Steps Performed:**
+  1. Inspected `client/src/components/ProductCard.jsx` code path and variable declaration order.
+  2. Identified that `lowestOffer` was declared after being read by `retailerName`.
+  3. Verified that backend `/api/products/search?q=samsung` was functioning correctly and returning genuine live products from MongoDB/Apify, confirming the failure was purely in frontend component rendering.
+- **Solution Attempted:**
+  1. Reordered variable declarations in `ProductCard.jsx` so `validOffers` and `lowestOffer` are computed first before `retailerName` and `displayPrice` are evaluated.
+  2. Added defensive destructuring for `product` properties with defaults (`offers = []`, `title = ''`, etc.).
+  3. Created `client/src/components/ErrorBoundary.jsx` and wrapped `<Routes>` in `App.jsx` to ensure that any component-level rendering glitch will never collapse the navigation or render a completely blank application.
+  4. Verified new Apify API token from `nagavamshi2012@gmail.com` (`verdant_observatory`) with $5.00 available credit, and ran a controlled live search for `samsung` confirming live products from Amazon India and Flipkart are retrieved and persisted to MongoDB Atlas without errors.
+- **Whether Solution Worked:** Yes.
+- **Verification Evidence:**
+  - `npm --prefix client run build` completed cleanly in 970ms with zero errors.
+  - `npm --prefix server test` passed all 20 test suites and 203 tests green.
+  - Controlled `/api/products/search?q=samsung` returned genuine live products with integer paise pricing, valid URLs, and active retailer store badges.
+  - Tested `/search?q=samsung` HTML rendering and verified layout structure.
+- **Files Changed:**
+  - `client/src/components/ProductCard.jsx`
+  - `client/src/components/ErrorBoundary.jsx`
+  - `client/src/App.jsx`
+  - `client/src/pages/SearchPage.jsx`
+- **Prevention Steps:**
+  - Always enforce ErrorBoundary boundaries around critical application views.
+  - Ensure computed state variables are declared before dependent derived properties.
+- **Related Errors:** ERR-008.

@@ -151,4 +151,43 @@ describe('Authentication & Authorization API (Document 1 Section 6.1)', () => {
       expect(res.body.error.code).toBe('AUTH_INVALID');
     });
   });
+
+  describe('Registration OTP Flow (/register/initiate, /verify, /resend)', () => {
+    const otpEmail = `otp_user_${Date.now()}@example.com`;
+    let otpUserId = '';
+
+    afterAll(async () => {
+      if (otpUserId) {
+        await User.findByIdAndDelete(otpUserId);
+      }
+    });
+
+    it('should initiate registration and save an OtpChallenge', async () => {
+      const res = await request(app)
+        .post('/api/auth/register/initiate')
+        .send({
+          name: 'OTP Shopper',
+          email: otpEmail,
+          password: 'StrongOtpPassword123!',
+        });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.email).toBe(otpEmail.toLowerCase());
+      expect(res.body.data.resendCooldownSeconds).toBe(60);
+    });
+
+    it('should reject OTP verification with incorrect code', async () => {
+      const res = await request(app)
+        .post('/api/auth/register/verify')
+        .send({
+          email: otpEmail,
+          otp: '000000',
+        });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('OTP_INVALID');
+    });
+  });
 });
