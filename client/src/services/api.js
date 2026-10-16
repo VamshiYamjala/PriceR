@@ -3,8 +3,12 @@ import axios from 'axios';
 // The one shared Axios instance for the whole app.
 // Every request goes through this — never create a second axios instance
 // and never use the raw fetch() API anywhere in this codebase.
+// Normalizes VITE_API_URL: trims trailing slashes and redundant /api suffix.
+const rawBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const apiBaseUrl = rawBaseUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: apiBaseUrl,
 });
 
 // localStorage key for the JWT — must match AuthContext.jsx exactly.
@@ -67,7 +71,7 @@ export function searchProducts(q, options = {}) {
 }
 
 export function getProduct(productId) {
-  return unwrap(api.get(`/api/products/${productId}`));
+  return unwrap(api.get(`/api/products/${encodeURIComponent(productId)}`));
 }
 
 export function getCategories() {
@@ -83,11 +87,11 @@ export function getProviderStatus() {
 }
 
 export function getOffer(offerId) {
-  return unwrap(api.get(`/api/offers/${offerId}`));
+  return unwrap(api.get(`/api/offers/${encodeURIComponent(offerId)}`));
 }
 
 export function getOfferHistory(offerId) {
-  return unwrap(api.get(`/api/offers/${offerId}/history`));
+  return unwrap(api.get(`/api/offers/${encodeURIComponent(offerId)}/history`));
 }
 
 // =========================================================================

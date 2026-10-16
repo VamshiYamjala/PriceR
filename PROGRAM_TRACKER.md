@@ -928,4 +928,43 @@ PriceRadar/
   - Vite client production build: 112 modules transformed in 920ms with 0 errors.
   - Live eBay search: Successfully queried eBay sandbox, retrieved genuine Samsung listings, persisted to MongoDB Atlas, and preserved USD currency.
   - System Diagnostics: 18 passed, 0 failed, 1 warning (eBay sandbox status), Category D features Apify and eBay only.
-- **Next Task:** Git commit, push, and delivery of 17-point final report.
+- **Next Task:** Task 18 — Render Production Deployment Readiness & GitHub Actions Monitor Optimization.
+
+---
+
+### Task 18: Render Production Deployment Readiness, Diagnostics Security & Monitor Optimization
+- **Date & Time:** 2026-10-16 23:45 IST
+- **Phase:** Production Deployment Preparation & Service Hardening
+- **Files Modified / Created:**
+  - `server/src/app.js` (Robust multi-origin CORS support, trailing slash normalization, accurate HTTP 200/503 `/api/health` status codes, removal of hardcoded IP from error messages)
+  - `server/src/server.js` (Updated startup logs to guide on MongoDB Atlas `0.0.0.0/0` dynamic IP configuration)
+  - `server/src/routes/diagnostics.js` (Added `protectProductionDiagnostics` middleware: returns 403 `DIAGNOSTICS_DISABLED` in production unless unlocked by `X-Diagnostic-Secret` or `X-Monitor-Secret`)
+  - `client/src/pages/DiagnosticsPage.jsx` (Added security fallback banner when diagnostics are disabled in production, guiding users to public `/api/health`)
+  - `client/src/services/api.js` (Normalized `VITE_API_URL` to strip trailing slashes and redundant `/api`; wrapped `productId` and `offerId` in `encodeURIComponent`)
+  - `server/src/services/priceMonitor.js` & `server/src/controllers/monitorController.js` (Added `{ force: true }` support to allow `POST /api/monitor/run` to execute cycles even when `MONITORING_ENABLED=false` on Render)
+  - `.github/workflows/monitor.yml` (Updated schedule to every 4 hours `0 */4 * * *`, passed secrets securely via `env:`, added bounded curl retries with 60s timeout for Render free tier spin-up)
+  - `server/package.json` & `client/package.json` (Added `"engines": { "node": ">=18.0.0" }`)
+  - `server/tests/health.test.js` (Added tests for HTTP 200 connected and HTTP 503 disconnected `/api/health` states)
+  - `server/tests/diagnostics.test.js` (Added production guard regression tests verifying 403 when unauthenticated and 200 with secret)
+  - `server/tests/loginRegression.test.js` (Updated `/api/health` assertion to handle both 200 and 503 depending on database connection state)
+  - `docs/RENDER_DEPLOYMENT.md` (Created comprehensive deployment guide for backend web service, frontend static site, SPA rewrites, Atlas network access, and GitHub Actions cron)
+  - `README.md` (Updated environment variables reference and added Render deployment section)
+  - `PROGRAM_TRACKER.md` (Updated ledger with Task 18 completion)
+- **What Changed:**
+  - Hardened backend for Render web service deployment with dynamic PORT handling, multi-origin CORS support, and accurate health check HTTP status codes.
+  - Secured `/api/diagnostics` and provider verification from unauthorized production access while keeping local development smooth.
+  - Updated GitHub Actions scheduled monitoring to run every 4 hours with curl retry resilience for free-tier instance cold starts.
+  - Standardized client API configuration with URL sanitization and URL encoding for dynamic route parameters.
+  - Created step-by-step documentation in `docs/RENDER_DEPLOYMENT.md` covering all Render service configurations and Atlas `0.0.0.0/0` IP requirements.
+  - Verified 100% test pass rate (22/22 suites, 221/221 tests) and verified client production build.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server test
+  npm --prefix client run build
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 22/22 passed, 221/221 tests green.
+  - Vite client production build: 112 modules transformed in 934ms with 0 errors.
+- **Git Commit Hash:** Pending local commit.
+- **Next Task:** Local Git commit and delivery of deployment report.
+

@@ -5,6 +5,7 @@ export default function DiagnosticsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
   const [filter, setFilter] = useState('all'); // all | pass | fail | warning | not_configured
   const [expandedCategories, setExpandedCategories] = useState({});
   const [copied, setCopied] = useState(false);
@@ -14,6 +15,7 @@ export default function DiagnosticsPage() {
   const fetchDiagnostics = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const res = await api.getDiagnostics();
       setData(res);
@@ -27,6 +29,7 @@ export default function DiagnosticsPage() {
         setExpandedCategories(initialExpanded);
       }
     } catch (err) {
+      setErrorCode(err.response?.data?.error?.code || null);
       setError(err.response?.data?.error?.message || err.message || 'Failed to load diagnostics');
     } finally {
       setLoading(false);
@@ -173,14 +176,36 @@ ${Object.entries(data.categories || {})
           </div>
         </div>
 
-        {error && (
+        {errorCode === 'DIAGNOSTICS_DISABLED' ? (
+          <div className="card border-0 shadow-sm rounded-3 p-4 bg-white mb-4">
+            <div className="d-flex align-items-start gap-3">
+              <span className="fs-2">🔒</span>
+              <div className="flex-grow-1">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <h2 className="h5 fw-bold text-dark mb-0">Production Diagnostics Protected</h2>
+                  <span className="badge bg-secondary-subtle text-secondary border px-2 py-1">Protected in Production</span>
+                </div>
+                <p className="text-muted small mb-3">
+                  Detailed infrastructure diagnostics, environment inspection, and provider-verification endpoints are disabled in production to protect application security.
+                </p>
+                <div className="p-3 rounded-2 bg-light border small text-secondary">
+                  <strong>Public Health Probe:</strong> The lightweight deployment health status endpoint remains available for uptime monitoring at{' '}
+                  <a href="/api/health" target="_blank" rel="noopener noreferrer" className="fw-semibold text-success text-decoration-underline">
+                    /api/health
+                  </a>.
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : error ? (
           <div className="alert alert-danger mb-4 shadow-sm" role="alert">
             <div className="fw-bold mb-1">Diagnostic Runner Error</div>
             <div className="small">{error}</div>
           </div>
-        )}
+        ) : null}
 
-        {/* Top Summary Dashboard Cards */}
+        {data && (
+          <>
         <div className="row g-3 mb-4">
           <div className="col-6 col-md-2">
             <div className="card h-100 border-0 shadow-sm p-3 rounded-3 bg-white">
@@ -495,6 +520,8 @@ ${Object.entries(data.categories || {})
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

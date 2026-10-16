@@ -90,4 +90,43 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
     expect(res.body.data.provider).toBe('apify');
     expect(res.body.data.actors).toBeDefined();
   });
+
+  describe('Production Environment Diagnostics Protection', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const testSecret = 'test-admin-secret-xyz';
+
+    beforeAll(() => {
+      process.env.ADMIN_DIAGNOSTIC_SECRET = testSecret;
+    });
+
+    afterAll(() => {
+      process.env.NODE_ENV = originalEnv;
+      delete process.env.ADMIN_DIAGNOSTIC_SECRET;
+    });
+
+    it('should block unauthenticated diagnostics access in production with 403 DIAGNOSTICS_DISABLED', async () => {
+      process.env.NODE_ENV = 'production';
+      try {
+        const res = await request(app).get('/api/diagnostics');
+        expect(res.status).toBe(403);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.code).toBe('DIAGNOSTICS_DISABLED');
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+
+    it('should allow access in production when valid X-Diagnostic-Secret is provided', async () => {
+      process.env.NODE_ENV = 'production';
+      try {
+        const res = await request(app)
+          .get('/api/diagnostics')
+          .set('X-Diagnostic-Secret', testSecret);
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    }, 25000);
+  });
 });

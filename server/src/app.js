@@ -16,10 +16,24 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
-// CORS: only the configured frontend origin may call this API
+// CORS: parse CLIENT_ORIGIN (supports single URL, comma-separated URLs, or local fallback)
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. curl, Render health probes, server-to-server)
+      if (!origin) return callback(null, true);
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
   })
 );
 
@@ -28,11 +42,14 @@ app.use(express.json());
 
 import mongoose from 'mongoose';
 
-// Health check — no auth, used by deployment checks and the team itself
+// Health check — no auth, used by Render and deployment health monitoring
+// Returns HTTP 200 when database is connected, HTTP 503 when database is unavailable
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+  const isConnected = mongoose.connection.readyState === 1;
+  const statusCode = isConnected ? 200 : 503;
+  return res.status(statusCode).json({
+    status: isConnected ? 'ok' : 'unhealthy',
+    database: isConnected ? 'connected' : 'disconnected',
     time: new Date().toISOString(),
   });
 });
@@ -45,7 +62,7 @@ app.use('/api', (req, res, next) => {
       success: false,
       error: {
         code: 'DATABASE_DISCONNECTED',
-        message: 'Database is temporarily unreachable. If using MongoDB Atlas, please ensure your current IP address (103.88.236.42) is added to the Atlas IP Access List.',
+        message: 'Database is temporarily unreachable. If using MongoDB Atlas, please ensure your hosting environment IP or 0.0.0.0/0 is added to the Atlas IP Access List.',
       },
     });
   }

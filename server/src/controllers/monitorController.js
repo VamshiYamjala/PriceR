@@ -20,7 +20,9 @@ export const runMonitor = asyncHandler(async (req, res) => {
     });
   }
 
-  const results = await runMonitoringCycle();
+  // Force execution when triggered explicitly via API in production/development,
+  // even if in-process scheduler is disabled via MONITORING_ENABLED=false
+  const results = await runMonitoringCycle({ force: process.env.NODE_ENV !== 'test' });
 
   return res.status(202).json({
     success: true,

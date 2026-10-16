@@ -43,7 +43,7 @@ async function tryConnectDb() {
     startBackgroundServices();
   } catch (err) {
     console.error('[server] Database connection warning:', err.message);
-    console.error('👉 If accessing MongoDB Atlas, please verify that your current public IP is whitelisted in Atlas Network Access (0.0.0.0/0).');
+    console.error('👉 If accessing MongoDB Atlas, please verify that your hosting outbound IP or 0.0.0.0/0 is added to Atlas Network Access.');
     if (!dbRetryTimer && process.env.NODE_ENV !== 'test') {
       console.log('[server] Retrying database connection every 10 seconds...');
       dbRetryTimer = setInterval(tryConnectDb, 10000);

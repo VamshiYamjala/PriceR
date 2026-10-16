@@ -254,13 +254,18 @@ PriceRadar/
 | `TELEGRAM_BOT_TOKEN` | Yes | Telegram Bot Token from @BotFather | `123456789:ABCDefgh...` |
 | `TELEGRAM_BOT_USERNAME` | No | Telegram Bot username | `PriceRadar_Alerts_Bot` |
 | `MONITOR_TRIGGER_SECRET` | Yes | Header secret for `POST /api/monitor/run` | `random-32-byte-hex-string` |
-| `MONITORING_ENABLED` | Yes | Enable/disable monitoring cycles | `true` |
+| `ADMIN_DIAGNOSTIC_SECRET` | No | Optional secret to unlock `/api/diagnostics` in production | `random-32-byte-hex-string` |
+| `MONITORING_ENABLED` | Yes | Enable/disable monitoring cycles (`false` recommended on Render free tier) | `true` |
 | `APIFY_API_TOKEN` | Yes | Apify Personal API Token | `apify_api_...` |
 | `APIFY_ACTOR_AMAZON` | No | Apify Amazon India Actor ID | `junglee/free-amazon-product-scraper` |
 | `APIFY_ACTOR_FLIPKART` | No | Apify Flipkart Actor ID | `shahidirfan/Flipkart-Product-Scraper` |
 | `APIFY_ACTOR_MEESHO` | No | Apify Meesho Actor ID | `scrapeai/meesho-product-scraper` |
 | `APIFY_MAX_ITEMS` | No | Maximum items per search | `5` |
 | `APIFY_TIMEOUT_SECS` | No | Actor execution timeout in seconds | `60` |
+| `EBAY_CLIENT_ID` | Yes | eBay Developer Application Client ID | `your_ebay_client_id` |
+| `EBAY_CLIENT_SECRET` | Yes | eBay Developer Application Client Secret | `your_ebay_client_secret` |
+| `EBAY_ENV` | No | eBay Environment (`SANDBOX` or `PRODUCTION`) | `SANDBOX` |
+| `EBAY_MARKETPLACE_ID` | No | eBay Marketplace Identifier | `EBAY_IN` |
 
 ### Frontend (`client/.env`)
 | Variable | Required | Description | Example |
@@ -269,7 +274,33 @@ PriceRadar/
 
 ---
 
-## 8. Retailer Data and Honest Fallback Policy
+## 8. Production Deployment to Render
+
+PriceRadar is production-ready for deployment to Render as two decoupled services:
+
+1. **Backend Web Service (`server` directory):**
+   - **Environment:** Node (`>=18.0.0`)
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+   - **Health Check Path:** `/api/health` (returns HTTP 200 when MongoDB is connected, HTTP 503 when disconnected)
+   - **MongoDB Atlas Network Access:** Add `0.0.0.0/0` (Allow Access from Anywhere) because Render free tier instances use dynamic outbound IPs.
+
+2. **Frontend Static Site (`client` directory):**
+   - **Environment:** Static Site
+   - **Build Command:** `npm install && npm run build`
+   - **Publish Directory:** `dist`
+   - **Redirect/Rewrite Rule (Crucial for SPA):** Rewrite `/*` to `/index.html` to support client-side routing.
+
+3. **External Monitoring with GitHub Actions:**
+   - On the Render Free Tier, backend services sleep after 15 minutes of inactivity.
+   - The `.github/workflows/monitor.yml` workflow runs every 4 hours (`0 */4 * * *`) to wake up the server and trigger price monitoring via `POST /api/monitor/run`.
+   - Requires GitHub repository secrets `BACKEND_URL` and `MONITOR_TRIGGER_SECRET`.
+
+For step-by-step instructions and complete configuration details, refer to the [Render Deployment Guide](./docs/RENDER_DEPLOYMENT.md).
+
+---
+
+## 9. Retailer Data and Honest Fallback Policy
 
 - **Fixture Fallback:** Reliable seeded dataset (`server/src/providers/fixtureData.json`) containing 6 products and 12 offers across Flipkart and Amazon.
 - **Sample Labelling:** Every mock offer contains `isSample: true` and is clearly rendered with a "Sample data" badge in the UI.
@@ -279,7 +310,7 @@ PriceRadar/
 
 ---
 
-## 9. Git Workflow & Branch Strategy
+## 10. Git Workflow & Branch Strategy
 
 - **`main` Branch:** Protected production branch. Direct commits to `main` are restricted.
 - **Feature Branches:** Team members branch off `main`:
@@ -291,7 +322,7 @@ PriceRadar/
 
 ---
 
-## 10. Project Documentation
+## 11. Project Documentation
 
 Comprehensive documentation guides are preserved in the [`docs/`](./docs) folder:
 - [01 — Master Project Development Guide (PDF)](./docs/01-MASTER-PROJECT-DEVELOPMENT-GUIDE.pdf)

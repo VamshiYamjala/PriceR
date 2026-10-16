@@ -1,21 +1,69 @@
-name: Hourly Price Monitor
+name: PriceRadar Scheduled Price Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Runs every hour on the hour (UTC)
-  workflow_dispatch:        # Allows manual trigger from GitHub Actions UI
+    # Runs every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
+    - cron: '0 */4 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions dashboard
 
 jobs:
   trigger-monitor:
+    name: Trigger Price Refresh Cycle
     runs-on: ubuntu-latest
     steps:
-      - name: Call POST /api/monitor/run
+      - name: Trigger Remote Monitor Endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          MONITOR_SECRET: ${{ secrets.MONITOR_TRIGGER_SECRET }}
         run: |
-          STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST "${{ secrets.BACKEND_URL }}/api/monitor/run" -H "X-Monitor-Secret: ${{ secrets.MONITOR_TRIGGER_SECRET }}")
-          echo "HTTP status: $STATUS"
-          echo "Response body:"
-          cat response.json
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
-            echo "::error::Monitor trigger failed with HTTP status $STATUS"
+          set -e
+
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::Required secret BACKEND_URL is not configured in GitHub repository secrets."
+            exit 1
+          fi
+
+          if [ -z "$MONITOR_SECRET" ]; then
+            echo "::error::Required secret MONITOR_TRIGGER_SECRET is not configured in GitHub repository secrets."
+            exit 1
+          fi
+
+          # Strip any trailing slash from BACKEND_URL
+          BASE_URL="${BACKEND_URL%/}"
+          TARGET_URL="${BASE_URL}/api/monitor/run"
+
+          echo "Triggering price monitor endpoint: ${BASE_URL}/api/monitor/run"
+          echo "Using bounded retries to accommodate Render free-tier cold starts..."
+
+          # Curl with bounded retries for sleeping Render free instances:
+          # --retry 3: retry transient errors up to 3 times
+          # --retry-delay 5: wait 5s between retries
+          # --retry-connrefused: retry if connection is refused during cold start
+          # --max-time 60: bound request to 60 seconds
+          HTTP_CODE=$(curl -s -S -o response.json -w "%{http_code}" \
+            --retry 3 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            --max-time 60 \
+            -X POST "$TARGET_URL" \
+            -H "X-Monitor-Secret: $MONITOR_SECRET" \
+            -H "Content-Type: application/json" || echo "000")
+
+          echo "HTTP Status Code: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Price monitoring cycle triggered successfully."
+            if [ -f response.json ]; then
+              echo "Sanitized Response Payload:"
+              cat response.json
+              echo ""
+            fi
+          else
+            echo "::error::Price monitor trigger failed with HTTP status $HTTP_CODE"
+            if [ -f response.json ]; then
+              echo "Server Error Response:"
+              cat response.json
+              echo ""
+            fi
             exit 1
           fi

@@ -44,8 +44,8 @@ export function setMonitorStateForTesting(state) {
  * Runs a full or on-demand price monitoring cycle.
  * @returns {Promise<{offersChecked: number, triggeredAlerts: number, errors: number}>}
  */
-export async function runMonitoringCycle() {
-  if (process.env.MONITORING_ENABLED === 'false') {
+export async function runMonitoringCycle(options = {}) {
+  if (process.env.MONITORING_ENABLED === 'false' && !options.force) {
     console.log('[monitor] Monitoring is disabled via MONITORING_ENABLED=false');
     return { offersChecked: 0, triggeredAlerts: 0, errors: 0 };
   }
