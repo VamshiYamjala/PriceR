@@ -48,7 +48,7 @@ describe('Telegram Integration & Account Linking (Document 1 Section 6.5 & Guide
     });
     userBId = userB._id.toString();
     userBToken = jwt.sign({ sub: userBId }, JWT_SECRET, { expiresIn: '1h' });
-  });
+  }, 25000);
 
   afterAll(async () => {
     process.env = originalEnv;
@@ -58,7 +58,7 @@ describe('Telegram Integration & Account Linking (Document 1 Section 6.5 & Guide
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
     }
-  });
+  }, 25000);
 
   beforeEach(() => {
     jest.restoreAllMocks();

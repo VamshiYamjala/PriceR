@@ -174,4 +174,15 @@ export function getMonitorStatus() {
   return unwrap(api.get('/api/monitor/status'));
 }
 
+// =========================================================================
+// System Diagnostics & Health Dashboard
+// =========================================================================
+export function getDiagnostics() {
+  return unwrap(api.get('/api/diagnostics'));
+}
+
+export function verifyDiagnosticSource(sourceId) {
+  return unwrap(api.get(`/api/diagnostics/sources/${encodeURIComponent(sourceId)}`));
+}
+
 export default api;

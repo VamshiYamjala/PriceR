@@ -32,8 +32,16 @@ export default function ProductCard({ product, onOpen }) {
     ? (lowestOffer.retailer.charAt(0).toUpperCase() + lowestOffer.retailer.slice(1))
     : (lowestOffer?.provider === 'fixture' ? 'Amazon' : lowestOffer?.provider || 'Retailer');
 
+  const currencySymbol =
+    lowestOffer?.currency === 'USD' ? '$' :
+    lowestOffer?.currency === 'EUR' ? '€' :
+    lowestOffer?.currency === 'GBP' ? '£' : '₹';
+
   const displayPrice = lowestOffer?.priceInPaise
-    ? `₹${(lowestOffer.priceInPaise / 100).toLocaleString('en-IN')}`
+    ? `${currencySymbol}${(lowestOffer.priceInPaise / 100).toLocaleString(lowestOffer.currency === 'INR' || !lowestOffer.currency ? 'en-IN' : 'en-US', {
+        minimumFractionDigits: lowestOffer.currency === 'INR' || !lowestOffer.currency ? 0 : 2,
+        maximumFractionDigits: 2,
+      })}`
     : 'Check price';
 
   async function handleToggleWatchlist(e) {

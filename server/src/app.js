@@ -11,6 +11,7 @@ import notificationRoutes from './routes/notifications.js';
 import notificationPreferencesRoutes from './routes/notificationPreferences.js';
 import telegramRoutes from './routes/telegram.js';
 import monitorRoutes from './routes/monitor.js';
+import diagnosticsRoutes from './routes/diagnostics.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -38,7 +39,7 @@ app.get('/api/health', (req, res) => {
 
 // Fast-fail middleware: if database is disconnected in non-test mode, return actionable 503 instead of 10-second timeout
 app.use('/api', (req, res, next) => {
-  if (req.path === '/health') return next();
+  if (req.path === '/health' || req.path.startsWith('/diagnostics')) return next();
   if (process.env.NODE_ENV !== 'test' && mongoose.connection.readyState !== 1) {
     return res.status(503).json({
       success: false,
@@ -61,6 +62,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/monitor', monitorRoutes);
+app.use('/api/diagnostics', diagnosticsRoutes);
 
 // 404 for anything that matched no route above
 app.use((req, res) => {

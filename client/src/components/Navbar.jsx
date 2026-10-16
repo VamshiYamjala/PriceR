@@ -61,6 +61,15 @@ export default function Navbar() {
               </svg>
               <span>Price alerts</span>
             </NavLink>
+            <NavLink
+              to="/diagnostics"
+              className={({ isActive }) => `nav-link-pr d-flex align-items-center gap-1 ${isActive ? 'active' : ''}`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+              <span>Diagnostics</span>
+            </NavLink>
           </nav>
 
           {/* Desktop Right Actions */}
@@ -151,6 +160,9 @@ export default function Navbar() {
               </NavLink>
               <NavLink to="/notifications" className="sidebar-nav-link" onClick={closeMenu}>
                 Notifications
+              </NavLink>
+              <NavLink to="/diagnostics" className="sidebar-nav-link" onClick={closeMenu}>
+                Diagnostics
               </NavLink>
               {isAuthenticated && (
                 <NavLink to="/dashboard" className="sidebar-nav-link" onClick={closeMenu}>

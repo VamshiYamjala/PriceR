@@ -14,6 +14,7 @@ import AlertFormPage from './pages/AlertFormPage';
 import AlertManagementPage from './pages/AlertManagementPage';
 import NotificationPreferencesPage from './pages/NotificationPreferencesPage';
 import NotificationHistoryPage from './pages/NotificationHistoryPage';
+import DiagnosticsPage from './pages/DiagnosticsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
@@ -28,6 +29,8 @@ export default function App() {
           <Route path="/products/:productId" element={<ProductDetailPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/diagnostics" element={<DiagnosticsPage />} />
+          <Route path="/dev/diagnostics" element={<DiagnosticsPage />} />
           <Route
             path="/dashboard"
             element={

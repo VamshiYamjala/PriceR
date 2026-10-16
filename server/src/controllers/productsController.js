@@ -5,6 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import * as dummyjsonProvider from '../providers/dummyjson.js';
 import * as mockshopProvider from '../providers/mockshop.js';
 import * as apifyProvider from '../providers/apify.js';
+import * as ebayProvider from '../providers/ebay.js';
 
 function toOfferSummary(offer) {
   const rawRetailer = offer.retailer || (
@@ -22,6 +23,7 @@ function toOfferSummary(offer) {
     originalPrice: offer.originalPrice ?? null,
     originalCurrency: offer.originalCurrency ?? null,
     currency: offer.currency,
+    crossCurrencyComparable: offer.crossCurrencyComparable ?? (offer.currency === 'INR'),
     availability: offer.availability,
     productUrl: offer.productUrl,
     isSample: offer.isSample,
@@ -191,11 +193,81 @@ export const searchProducts = asyncHandler(async (req, res) => {
     }
   }
 
+  // 2b. Query eBay Browse API when targeted or when configured alongside live retailers
+  const isEbayTargeted =
+    providerFilter === 'ebay' ||
+    (providerFilter === 'live' && req.query.retailer === 'ebay') ||
+    (providerFilter === 'all' && ebayProvider.isConfigured() && process.env.NODE_ENV !== 'test');
+
+  if (isEbayTargeted && q && Product.db?.readyState === 1 && ebayProvider.isConfigured()) {
+    try {
+      const ebayRes = await ebayProvider.searchProducts(q, { limit: 10 });
+      if (ebayRes && Array.isArray(ebayRes.products) && ebayRes.products.length > 0) {
+        const ebayItems = [];
+        for (const item of ebayRes.products) {
+          try {
+            const canonicalKey = item.canonicalKey || `ebay-${item.externalId}`.toLowerCase();
+            const persistedProduct = await Product.findOneAndUpdate(
+              { canonicalKey },
+              {
+                title: item.title,
+                brand: item.brand,
+                model: item.model,
+                variant: item.variant,
+                category: item.category || 'marketplace',
+                description: item.description,
+                imageUrl: item.imageUrl,
+                sourceProvider: 'ebay',
+                externalId: item.externalId,
+                sourceUrl: item.sourceUrl,
+                dataStatus: item.dataStatus || 'live',
+              },
+              { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            const offerData = item.offers?.[0];
+            if (offerData && persistedProduct) {
+              const persistedOffer = await Offer.findOneAndUpdate(
+                { provider: 'ebay', externalProductId: String(offerData.externalProductId) },
+                {
+                  productId: persistedProduct._id,
+                  retailer: 'ebay',
+                  title: offerData.title || item.title,
+                  productUrl: offerData.productUrl || item.sourceUrl,
+                  priceInPaise: offerData.priceInPaise,
+                  originalPrice: offerData.originalPrice,
+                  originalCurrency: offerData.originalCurrency,
+                  currency: offerData.currency || 'USD',
+                  crossCurrencyComparable: offerData.crossCurrencyComparable ?? false,
+                  availability: offerData.availability || 'in_stock',
+                  isSample: offerData.isSample ?? false,
+                  dataStatus: offerData.dataStatus || 'live',
+                  lastStatus: 'ok',
+                  lastSuccessAt: new Date(),
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+              );
+
+              item.id = persistedProduct._id.toString();
+              item.offers = [toOfferSummary(persistedOffer)];
+              ebayItems.push(item);
+            }
+          } catch (persistErr) {
+            console.warn('[search] Failed to persist eBay item:', persistErr.message);
+          }
+        }
+        combined = ebayItems.concat(combined);
+      }
+    } catch (ebayErr) {
+      console.warn('[search] eBay search error:', ebayErr.message);
+    }
+  }
+
   // 3. Query DummyJSON external catalog for discovery ONLY when explicitly requested or in test mode
   const shouldQueryDummyJson =
     providerFilter === 'dummyjson' ||
     providerFilter === 'sample' ||
-    (process.env.NODE_ENV === 'test' && providerFilter === 'all');
+    (process.env.NODE_ENV === 'test' && (providerFilter === 'all' || providerFilter === 'dummyjson'));
 
   if (shouldQueryDummyJson) {
     try {
@@ -507,84 +579,93 @@ export const getAutocomplete = asyncHandler(async (req, res) => {
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
-  const coreCategories = ['audio', 'laptops', 'cameras', 'smartphones', 'wearables', 'electronics'];
-  let dummyCategories = [];
-  try {
-    dummyCategories = await dummyjsonProvider.getCategories();
-  } catch (_) {}
-  const merged = Array.from(new Set([...coreCategories, ...dummyCategories])).sort();
+  const coreCategories = ['audio', 'cameras', 'electronics', 'laptops', 'smartphones', 'wearables'];
 
   return res.status(200).json({
     success: true,
-    data: { categories: merged },
+    data: { categories: coreCategories },
   });
 });
 
 export const getProviderStatus = asyncHandler(async (req, res) => {
+  const ebayConfigured = ebayProvider.isConfigured();
+  const apifyConfig = apifyProvider.getApifyConfig();
+
   const providers = [
+    {
+      id: 'apify',
+      name: 'Apify Data Platform (Amazon, Flipkart, Meesho)',
+      type: 'live',
+      status: apifyConfig.isConfigured ? 'active' : 'unconfigured',
+      description: 'Primary cloud data extraction platform retrieving genuine live e-commerce listings.',
+      requiresAuth: true,
+      isConfigured: apifyConfig.isConfigured,
+      actors: ['amazon', 'flipkart', 'meesho'],
+    },
+    {
+      id: 'ebay',
+      name: 'eBay Browse API',
+      type: 'live',
+      status: ebayConfigured ? 'configured' : 'unconfigured',
+      description: 'Official eBay Marketplace Browse API (OAuth 2.0 application client credentials required).',
+      requiresAuth: true,
+      isConfigured: ebayConfigured,
+    },
     {
       id: 'fixture',
       name: 'Fixture Dataset',
       type: 'sample',
       status: 'active',
-      description: 'Deterministic multi-retailer test fixtures with simulated network delay.',
+      description: 'Deterministic multi-retailer test fixtures isolated for automated testing.',
       requiresAuth: false,
+      isConfigured: true,
     },
     {
       id: 'dummyjson',
       name: 'DummyJSON Catalog',
       type: 'sample',
       status: 'active',
-      description: 'Primary free sample catalog for product exploration with USD->INR conversion.',
+      description: 'Secondary sample catalog isolated from production live search and categories.',
       requiresAuth: false,
+      isConfigured: true,
+      mode: 'isolated_sample',
     },
     {
       id: 'mockshop',
       name: 'Shopify mock.shop',
       type: 'sample',
       status: 'active',
-      description: 'Fictional headless storefront GraphQL API for apparel exploration.',
+      description: 'Fictional headless storefront isolated from production live search.',
       requiresAuth: false,
+      isConfigured: true,
+      mode: 'isolated_sample',
     },
     {
       id: 'flipkart',
-      name: 'Flipkart Affiliate API',
+      name: 'Flipkart Affiliate API (Legacy)',
       type: 'live',
       status: 'standby',
       description: 'Official retailer feed adapter (routed to fixture fallback until verified).',
       requiresAuth: true,
+      isConfigured: Boolean(process.env.FLIPKART_AFFILIATE_ID && process.env.FLIPKART_AFFILIATE_TOKEN),
     },
     {
       id: 'amazon',
-      name: 'Amazon India',
+      name: 'Amazon India (Legacy Mock)',
       type: 'sample',
       status: 'mock_only',
-      description: 'Amazon mock-only policy (scraping strictly prohibited per compliance rules).',
+      description: 'Compliance policy mock; live Amazon queries are routed via Apify.',
       requiresAuth: false,
-    },
-    {
-      id: 'ebay',
-      name: 'eBay Browse API',
-      type: 'live',
-      status: process.env.EBAY_CLIENT_ID ? 'configured' : 'unconfigured',
-      description: 'Official eBay Marketplace Browse API (OAuth 2.0 client credentials required).',
-      requiresAuth: true,
-    },
-    {
-      id: 'apify',
-      name: 'Apify Data Platform (Amazon, Flipkart, Meesho)',
-      type: 'live',
-      status: apifyProvider.getApifyConfig().isConfigured ? 'active' : 'unconfigured',
-      description: 'Primary cloud data extraction platform retrieving genuine live e-commerce listings.',
-      requiresAuth: true,
+      isConfigured: true,
     },
     {
       id: 'scrapling',
       name: 'Scrapling Worker (Testbed)',
       type: 'live',
-      status: 'active',
+      status: 'standby',
       description: 'Isolated Python Scrapling worker for authorized domain extraction with SSRF protection.',
       requiresAuth: false,
+      isConfigured: Boolean(process.env.SCRAPLING_WORKER_URL),
     },
   ];
 

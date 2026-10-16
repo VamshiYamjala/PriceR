@@ -186,7 +186,7 @@ export default function SearchPage() {
           <h1 className="fw-bold tracking-tight mb-1" style={{ fontSize: '2.5rem' }}>
             Product search
           </h1>
-          <p className="text-muted mb-0">Live multi-store comparison across Amazon India, Flipkart & Meesho.</p>
+          <p className="text-muted mb-0">Live multi-store comparison across Amazon India, Flipkart, Meesho & eBay.</p>
         </div>
 
         {/* Large Search Box with Autocomplete Dropdown */}
@@ -319,6 +319,7 @@ export default function SearchPage() {
                 <option value="amazon">Amazon India</option>
                 <option value="flipkart">Flipkart</option>
                 <option value="meesho">Meesho</option>
+                <option value="ebay">eBay Marketplace</option>
               </select>
             )}
           </div>

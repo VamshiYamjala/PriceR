@@ -34,10 +34,11 @@ export default function OfferRow({ offer, isLowest }) {
   const [watchlistStatus, setWatchlistStatus] = useState(null);
   const [addingToWatchlist, setAddingToWatchlist] = useState(false);
 
-  const priceInRupees = (offer.priceInPaise / 100).toLocaleString('en-IN', {
+  const currencyCode = offer.currency || 'INR';
+  const priceInRupees = (offer.priceInPaise / 100).toLocaleString(currencyCode === 'INR' ? 'en-IN' : 'en-US', {
     style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
+    currency: currencyCode,
+    maximumFractionDigits: currencyCode === 'INR' ? 0 : 2,
   });
 
   const isTrackedOffer = Boolean(offer.id || offer._id);

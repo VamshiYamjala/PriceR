@@ -10,6 +10,7 @@ import * as dummyjsonProvider from './dummyjson.js';
 import * as mockshopProvider from './mockshop.js';
 import * as scraplingProvider from './scrapling.js';
 import * as apifyProvider from './apify.js';
+import * as ebayProvider from './ebay.js';
 
 /**
  * Dispatches an offer fetch to the configured provider.
@@ -21,6 +22,8 @@ export async function fetchOffer(offer) {
 
   if (offer.provider === 'apify') {
     result = await apifyProvider.fetchOffer(offer);
+  } else if (offer.provider === 'ebay') {
+    result = await ebayProvider.fetchOffer(offer);
   } else if (offer.provider === 'dummyjson') {
     result = await dummyjsonProvider.fetchOffer(offer);
   } else if (offer.provider === 'mockshop') {

@@ -853,9 +853,46 @@ PriceRadar/
   - Health check: `{"status":"ok","database":"connected"}`.
   - Apify diagnostic: ONLINE & VALID, 100% credit available.
   - Controlled live search: Succeeded with live products from Amazon and Flipkart.
-- **Next Task:** Verification complete. Deliver comprehensive final report.
+- **Next Task:** Task 16: Complete Product-Source Audit, Safe Isolation, eBay Integration and Dedicated System Diagnostics Dashboard.
 
+---
 
-
-
-
+### Task 16: Complete Product-Source Audit, eBay Integration and System Diagnostics Dashboard
+- **Date & Time:** 2026-10-16 22:45 IST
+- **Phase:** Architecture Hardening, Source Provenance, eBay Marketplace Integration & Diagnostics
+- **Files Modified / Created:**
+  - `server/src/providers/ebay.js` (Removed fixed USD-to-INR 83x conversion assumption; implemented currency preservation, offer validation, `fetchOffer` for price monitoring, and `verifyAccess` diagnostic)
+  - `server/src/providers/index.js` (Wired eBay provider into central `fetchOffer` dispatcher)
+  - `server/src/controllers/productsController.js` (Integrated eBay into live multi-retailer search, isolated DummyJSON and mock.shop from production search and categories, updated provider status metadata)
+  - `server/src/controllers/diagnosticsController.js` (Built comprehensive 9-category system diagnostics covering Categories A to I with 0 secret exposure)
+  - `server/src/routes/diagnostics.js` (Mounted `/api/diagnostics` and deep source verification endpoints)
+  - `server/src/app.js` (Registered diagnostics routes with bypass in fast-fail middleware)
+  - `server/tests/ebayProvider.test.js` (Created 10 unit tests for eBay configuration, normalization, and currency handling)
+  - `server/tests/diagnostics.test.js` (Created 5 tests for diagnostics summary, categories, and secret sanitization)
+  - `server/tests/telegram.test.js` (Hardened test hook timeout for stable CI/local test runs)
+  - `client/src/services/api.js` (Added `getDiagnostics` and `verifyDiagnosticSource` methods)
+  - `client/src/pages/DiagnosticsPage.jsx` (Created complete developer diagnostics dashboard with summary cards, category accordions, status badges, and actionable repair instructions)
+  - `client/src/pages/SearchPage.jsx` (Added eBay option to retailer filter dropdown and updated header description)
+  - `client/src/components/Navbar.jsx` (Added Diagnostics navigation link in desktop and mobile menus)
+  - `client/src/components/ProductCard.jsx` (Formatted price with genuine currency symbol and localized number formatting)
+  - `client/src/components/OfferRow.jsx` (Formatted price with genuine currency symbol)
+  - `client/src/App.jsx` (Mounted `/diagnostics` and `/dev/diagnostics` routes)
+  - `PROGRAM_TRACKER.md` (Updated development ledger)
+- **What Changed:**
+  - Completed comprehensive inventory and classification across all product data sources (Apify, eBay, DummyJSON, mock.shop, Fixtures, Scrapling worker, legacy Amazon/Flipkart adapters, MongoDB).
+  - Safely isolated sample catalogs (DummyJSON and mock.shop) so they are completely excluded from normal user-facing live searches and category listings, while preserving them for testing and legacy tracked offer refresh.
+  - Upgraded eBay provider adapter: removed unsafe fixed USD-to-INR 83x conversion rate, strictly preserved returned currency (`USD`, `EUR`, `GBP`, `INR`), enforced integer minor unit precision, added title and URL validation, implemented `fetchOffer` for scheduled monitoring, and created a secure diagnostic `verifyAccess()` method.
+  - Built a dedicated Developer System Diagnostics dashboard at `/diagnostics` and `/dev/diagnostics` providing real-time visibility into all 9 architectural categories (Environment, Database, Auth, Sources, Product API, Watchlist & Alerts, Notifications, Scheduler, Frontend) with 0 secret exposure.
+  - Verified backend test suite (22/22 test suites, 218/218 tests passing 100% green) and frontend production build (112 modules compiled in 971ms).
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server test
+  npm --prefix client run build
+  curl.exe -s http://localhost:5000/api/diagnostics
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 22/22 passed, 218/218 tests green.
+  - Vite client production build: 112 modules transformed cleanly in 971ms.
+  - Health endpoint: `{"status":"ok","database":"connected"}`.
+  - Diagnostics API: 19 passed, 0 failed, 1 warning (Scrapling standby), 1 not configured (eBay awaiting developer keys).
+- **Next Task:** Final git checkpoint, commit, push, and comprehensive 14-point report delivery.
