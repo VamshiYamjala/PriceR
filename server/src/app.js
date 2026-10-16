@@ -25,9 +25,30 @@ app.use(
 // Parses incoming JSON request bodies
 app.use(express.json());
 
+import mongoose from 'mongoose';
+
 // Health check — no auth, used by deployment checks and the team itself
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    time: new Date().toISOString(),
+  });
+});
+
+// Fast-fail middleware: if database is disconnected in non-test mode, return actionable 503 instead of 10-second timeout
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (process.env.NODE_ENV !== 'test' && mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'DATABASE_DISCONNECTED',
+        message: 'Database is temporarily unreachable. If using MongoDB Atlas, please ensure your current IP address (103.88.236.42) is added to the Atlas IP Access List.',
+      },
+    });
+  }
+  next();
 });
 
 // Route mounting

@@ -11,6 +11,8 @@ if (!process.env.MONGODB_URI) {
   dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 }
 
+let listenersAttached = false;
+
 export async function connectDB() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
@@ -19,17 +21,20 @@ export async function connectDB() {
     );
   }
 
-  mongoose.connection.on('connected', () => {
-    console.log('[db] Mongoose connected to MongoDB Atlas');
-  });
+  if (!listenersAttached) {
+    listenersAttached = true;
+    mongoose.connection.on('connected', () => {
+      console.log('[db] Mongoose connected to MongoDB Atlas');
+    });
 
-  mongoose.connection.on('error', (err) => {
-    console.error('[db] Mongoose connection error:', err.message);
-  });
+    mongoose.connection.on('error', (err) => {
+      console.error('[db] Mongoose connection error:', err.message);
+    });
 
-  mongoose.connection.on('disconnected', () => {
-    console.warn('[db] Mongoose disconnected from MongoDB');
-  });
+    mongoose.connection.on('disconnected', () => {
+      console.warn('[db] Mongoose disconnected from MongoDB');
+    });
+  }
 
   await mongoose.connect(uri);
 }

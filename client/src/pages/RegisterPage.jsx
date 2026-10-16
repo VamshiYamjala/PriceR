@@ -15,6 +15,7 @@ export default function RegisterPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
 
@@ -23,15 +24,20 @@ export default function RegisterPage() {
       await login({ email, password });
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.error?.message || 'Registration failed. Please try again.');
+      const msg =
+        err.response?.data?.error?.message ||
+        (err.code === 'ERR_NETWORK'
+          ? 'Cannot connect to backend server. Please ensure the backend is running on port 5000 and MongoDB Atlas is reachable.'
+          : 'Registration failed. Please try again.');
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="row justify-content-center py-5">
-      <div className="col-12 col-sm-10 col-md-7 col-lg-5" style={{ maxWidth: '440px' }}>
+    <div className="row justify-content-center py-4">
+      <div className="col-12 col-sm-10 col-md-7 col-lg-5" style={{ maxWidth: '420px' }}>
         <div
           className="card border-0 rounded-4 bg-white"
           style={{
@@ -40,9 +46,9 @@ export default function RegisterPage() {
             boxShadow: 'var(--pr-card-shadow)',
           }}
         >
-          <div className="card-body p-4 p-md-5">
-            <div className="text-center mb-4">
-              <div className="d-inline-block mb-3">
+          <div className="card-body p-4">
+            <div className="text-center mb-3">
+              <div className="d-inline-block mb-2">
                 <RadarLogo size={32} showWordmark={true} />
               </div>
               <h1 className="h4 fw-bold mb-1" style={{ color: 'var(--pr-text-dark)', letterSpacing: '-0.02em' }}>
@@ -59,7 +65,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate={false}>
               <div className="mb-3">
                 <label className="form-label small fw-semibold text-muted" htmlFor="register-name">
                   FULL NAME
@@ -70,9 +76,10 @@ export default function RegisterPage() {
                   className="form-control rounded-3 py-2"
                   placeholder="e.g. Maya Patel"
                   required
+                  autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  style={{ border: '1px solid var(--pr-border)' }}
+                  style={{ border: '1px solid var(--pr-border)', fontSize: '0.95rem' }}
                 />
               </div>
 
@@ -86,13 +93,14 @@ export default function RegisterPage() {
                   className="form-control rounded-3 py-2"
                   placeholder="name@example.com"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{ border: '1px solid var(--pr-border)' }}
+                  style={{ border: '1px solid var(--pr-border)', fontSize: '0.95rem' }}
                 />
               </div>
 
-              <div className="mb-4">
+              <div className="mb-3">
                 <label className="form-label small fw-semibold text-muted" htmlFor="register-password">
                   PASSWORD (MIN 8 CHARS)
                 </label>
@@ -103,22 +111,42 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   minLength={8}
                   required
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ border: '1px solid var(--pr-border)' }}
+                  style={{ border: '1px solid var(--pr-border)', fontSize: '0.95rem' }}
                 />
               </div>
 
               <button
                 type="submit"
-                className="btn btn-pr-primary w-100 py-2.5 fw-semibold"
+                id="register-submit-btn"
+                className="btn w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
+                style={{
+                  backgroundColor: 'var(--pr-forest)',
+                  color: '#FFFFFF',
+                  border: '1px solid var(--pr-forest)',
+                  borderRadius: '10px',
+                  minHeight: '44px',
+                  fontSize: '0.95rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.75 : 1,
+                  transition: 'all 0.2s ease',
+                }}
                 disabled={loading}
               >
-                {loading ? 'Creating account…' : 'Create account →'}
+                {loading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                    <span>Creating account…</span>
+                  </>
+                ) : (
+                  <span>Create account →</span>
+                )}
               </button>
             </form>
 
-            <div className="text-center mt-4 pt-2 border-top small text-muted">
+            <div className="text-center mt-3 pt-3 border-top small text-muted">
               Already have an account?{' '}
               <Link to="/login" className="fw-semibold text-decoration-none" style={{ color: 'var(--pr-forest)' }}>
                 Sign in here

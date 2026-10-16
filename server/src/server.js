@@ -7,26 +7,61 @@ import { startScheduler, stopScheduler } from './services/scheduler.js';
 
 const PORT = process.env.PORT || 5000;
 
-async function start() {
+let dbRetryTimer = null;
+let servicesStarted = false;
+
+function startBackgroundServices() {
+  if (servicesStarted) return;
+  servicesStarted = true;
+
+  if (process.env.NODE_ENV !== 'test' && process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      startLinkListener();
+      console.log('[server] Telegram account linking listener started');
+    } catch (err) {
+      console.warn('[server] Failed to start Telegram listener:', err.message);
+    }
+  }
+
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      startScheduler();
+    } catch (err) {
+      console.warn('[server] Failed to start price monitor scheduler:', err.message);
+    }
+  }
+}
+
+async function tryConnectDb() {
   try {
     await connectDB();
-    const server = app.listen(PORT, () => {
+    console.log('[server] Database connected successfully.');
+    if (dbRetryTimer) {
+      clearInterval(dbRetryTimer);
+      dbRetryTimer = null;
+    }
+    startBackgroundServices();
+  } catch (err) {
+    console.error('[server] Database connection warning:', err.message);
+    console.error('👉 If accessing MongoDB Atlas, please verify that your current public IP is whitelisted in Atlas Network Access (0.0.0.0/0).');
+    if (!dbRetryTimer && process.env.NODE_ENV !== 'test') {
+      console.log('[server] Retrying database connection every 10 seconds...');
+      dbRetryTimer = setInterval(tryConnectDb, 10000);
+    }
+  }
+}
+
+async function start() {
+  try {
+    const server = app.listen(PORT, async () => {
       console.log(`[server] PriceRadar API listening on port ${PORT}`);
-
-      // Start Telegram long-polling listener for local development
-      if (process.env.NODE_ENV !== 'test' && process.env.TELEGRAM_BOT_TOKEN) {
-        startLinkListener();
-        console.log('[server] Telegram account linking listener started');
-      }
-
-      // Start in-process 4-hour periodic price refresh scheduler
-      if (process.env.NODE_ENV !== 'test') {
-        startScheduler();
-      }
+      // Attempt database connection without aborting server startup on initial failure
+      await tryConnectDb();
     });
 
     const shutdown = () => {
       console.log('[server] Gracefully shutting down...');
+      if (dbRetryTimer) clearInterval(dbRetryTimer);
       stopLinkListener();
       stopScheduler();
       server.close(() => {
@@ -37,7 +72,7 @@ async function start() {
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
   } catch (err) {
-    console.error('[server] Failed to start:', err.message);
+    console.error('[server] Failed to bind HTTP server:', err.message);
     process.exit(1);
   }
 }

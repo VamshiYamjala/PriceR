@@ -466,10 +466,12 @@ a:hover {
 }
 
 .btn-pr-primary {
-  background-color: var(--pr-forest);
+  background-color: var(--pr-forest) !important;
   color: #FFFFFF !important;
-  border: 1px solid var(--pr-forest);
+  border: 1px solid var(--pr-forest) !important;
   font-weight: 600;
+  padding: 0.65rem 1.25rem !important;
+  min-height: 44px;
   border-radius: var(--pr-radius-md);
   display: inline-flex;
   align-items: center;
@@ -479,8 +481,8 @@ a:hover {
 }
 
 .btn-pr-primary:hover, .btn-pr-primary:focus {
-  background-color: var(--pr-forest-hover);
-  border-color: var(--pr-forest-hover);
+  background-color: var(--pr-forest-hover) !important;
+  border-color: var(--pr-forest-hover) !important;
   color: #FFFFFF !important;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(24, 60, 43, 0.15);
