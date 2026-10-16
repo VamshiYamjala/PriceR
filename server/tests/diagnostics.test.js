@@ -33,7 +33,7 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
       expect(Array.isArray(data.categories[cat].checks)).toBe(true);
       expect(data.categories[cat].checks.length).toBeGreaterThan(0);
     }
-  });
+  }, 25000);
 
   it('All diagnostic checks include standardized status badges and properties', async () => {
     const res = await request(app).get('/api/diagnostics');

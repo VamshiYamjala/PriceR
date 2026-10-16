@@ -85,7 +85,7 @@ describe('PriceRadar Notification Flow & Alert Engine Verification (10 Core Cond
       dataStatus: 'live',
       lastStatus: 'ok',
     });
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (!hasDb) return;
@@ -116,7 +116,7 @@ describe('PriceRadar Notification Flow & Alert Engine Verification (10 Core Cond
         await mongoose.connection.close();
       }
     }
-  });
+  }, 30000);
 
   // -------------------------------------------------------------------------
   // Condition 1: Target-price alert condition met vs not met

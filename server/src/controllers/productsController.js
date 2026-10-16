@@ -1,9 +1,8 @@
 // server/src/controllers/productsController.js
+import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import Offer from '../models/Offer.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import * as dummyjsonProvider from '../providers/dummyjson.js';
-import * as mockshopProvider from '../providers/mockshop.js';
 import * as apifyProvider from '../providers/apify.js';
 import * as ebayProvider from '../providers/ebay.js';
 
@@ -42,10 +41,15 @@ const CATEGORY_MAP = {
   electronics: /electronics|gadget|tablet|ipad|monitor/i,
 };
 
+/**
+ * Searches products across active discovery sources (Apify & eBay) and stored MongoDB catalog.
+ * DummyJSON and mock.shop have been removed from active product discovery.
+ */
 export const searchProducts = asyncHandler(async (req, res) => {
   const q = (req.query.q || '').trim();
   const category = (req.query.category || '').trim();
   const providerFilter = (req.query.provider || 'all').trim().toLowerCase();
+  const retailerFilter = (req.query.retailer || '').trim().toLowerCase();
 
   // If query is completely empty and no category is requested, return empty list
   if (!q && !category) {
@@ -54,8 +58,8 @@ export const searchProducts = asyncHandler(async (req, res) => {
 
   let dbProducts = [];
 
-  // 1. Search local DB (fixtures and stored products) unless filtered out
-  if (providerFilter === 'all' || providerFilter === 'fixture' || providerFilter === 'live') {
+  // 1. Search local DB (stored and previously discovered products) if DB connected
+  if (mongoose.connection.readyState === 1 && (providerFilter === 'all' || providerFilter === 'live' || providerFilter === 'fixture')) {
     const dbQuery = {};
     if (q) {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -72,6 +76,15 @@ export const searchProducts = asyncHandler(async (req, res) => {
       } else {
         dbQuery.$or = [{ category: catRegex }, { title: catRegex }];
       }
+    }
+
+    if (retailerFilter && retailerFilter !== 'all') {
+      // Find matching offer productIds if specific retailer requested
+      const matchingOffers = await Offer.find({
+        $or: [{ retailer: retailerFilter }, { provider: retailerFilter }],
+      }).select('productId');
+      const matchingProductIds = matchingOffers.map((o) => o.productId);
+      dbQuery._id = { $in: matchingProductIds };
     }
 
     dbProducts = await Product.find(dbQuery).limit(30);
@@ -96,316 +109,217 @@ export const searchProducts = asyncHandler(async (req, res) => {
     category: p.category ?? 'electronics',
     description: p.description ?? '',
     imageUrl: p.imageUrl ?? null,
-    sourceProvider: p.sourceProvider || 'fixture',
-    dataStatus: p.dataStatus || 'sample',
+    sourceProvider: p.sourceProvider || 'live',
+    dataStatus: p.dataStatus || 'live',
+    canonicalKey: p.canonicalKey,
     offers: offersByProduct.get(p._id.toString()) ?? [],
   }));
 
-  // 2. Query Apify Actor for genuine live retailer data (Amazon, Flipkart, Meesho)
-  const isApifyTargeted =
-    (providerFilter === 'all' && process.env.NODE_ENV !== 'test') ||
-    providerFilter === 'apify' ||
-    providerFilter === 'live' ||
-    ['amazon', 'flipkart', 'meesho'].includes(providerFilter);
-
-  const effectiveApifyQuery = q || (category && category !== 'all' ? (
+  // Determine whether to execute live discovery via Apify and/or eBay
+  const effectiveQuery = q || (category && category !== 'all' ? (
     category === 'audio' ? 'wireless headphones' :
     category === 'laptops' ? 'laptop' :
     category === 'cameras' ? 'camera' :
     category === 'smartphones' ? 'smartphone' : category
   ) : '');
 
-  if (isApifyTargeted && effectiveApifyQuery && Product.db?.readyState === 1) {
-    const apifyConfig = apifyProvider.getApifyConfig();
-    if (apifyConfig.isConfigured) {
-      try {
+  const hasSpecificRetailer = Boolean(retailerFilter && retailerFilter !== 'all');
+
+  const shouldQueryApify =
+    (!hasSpecificRetailer && (providerFilter === 'all' || providerFilter === 'live' || providerFilter === 'apify') && process.env.NODE_ENV !== 'test') ||
+    (hasSpecificRetailer && ['amazon', 'flipkart', 'meesho'].includes(retailerFilter)) ||
+    providerFilter === 'apify';
+
+  const shouldQueryEbay =
+    (!hasSpecificRetailer && (providerFilter === 'all' || providerFilter === 'live' || providerFilter === 'ebay') && process.env.NODE_ENV !== 'test') ||
+    (hasSpecificRetailer && retailerFilter === 'ebay') ||
+    providerFilter === 'ebay';
+
+  if (effectiveQuery && Product.db?.readyState === 1) {
+    const discoveryPromises = [];
+
+    // 2. Apify Actor Discovery (Amazon India, Flipkart, Meesho)
+    if (shouldQueryApify) {
+      const apifyConfig = apifyProvider.getApifyConfig();
+      if (apifyConfig.isConfigured) {
         let retailer = 'amazon';
-        if (providerFilter === 'flipkart') retailer = 'flipkart';
-        else if (providerFilter === 'meesho') retailer = 'meesho';
-        else if (req.query.retailer) retailer = req.query.retailer.toLowerCase();
+        if (retailerFilter === 'flipkart' || providerFilter === 'flipkart') retailer = 'flipkart';
+        else if (retailerFilter === 'meesho' || providerFilter === 'meesho') retailer = 'meesho';
 
-        const apifyRes = await apifyProvider.searchProducts(effectiveApifyQuery, {
-          retailer,
-          limit: apifyConfig.maxItems,
-        });
-
-        if (apifyRes && Array.isArray(apifyRes.products) && apifyRes.products.length > 0) {
-          const liveItems = [];
-
-          for (const item of apifyRes.products) {
+        discoveryPromises.push(
+          (async () => {
             try {
-              const canonicalKey = item.canonicalKey || `apify-${item.sourceProvider || retailer}-${item.externalId}`.toLowerCase();
-              const persistedProduct = await Product.findOneAndUpdate(
-                { canonicalKey },
-                {
-                  title: item.title,
-                  brand: item.brand,
-                  model: item.model,
-                  variant: item.variant,
-                  category: item.category || (category && category !== 'all' ? category : 'electronics'),
-                  description: item.description,
-                  imageUrl: item.imageUrl,
-                  sourceProvider: 'apify',
-                  externalId: item.externalId,
-                  sourceUrl: item.sourceUrl,
-                  dataStatus: 'live', // Genuine live retailer data
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-              );
+              const apifyRes = await apifyProvider.searchProducts(effectiveQuery, {
+                retailer,
+                limit: apifyConfig.maxItems || 6,
+              });
 
-              const offerData = item.offers?.[0];
-              if (offerData && persistedProduct) {
-                const persistedOffer = await Offer.findOneAndUpdate(
-                  { provider: 'apify', externalProductId: String(offerData.externalProductId) },
-                  {
-                    productId: persistedProduct._id,
-                    retailer: item.sourceProvider || retailer,
-                    title: offerData.title || item.title,
-                    productUrl: offerData.productUrl || item.sourceUrl,
-                    priceInPaise: offerData.priceInPaise,
-                    originalPrice: offerData.originalPrice,
-                    originalCurrency: offerData.originalCurrency,
-                    currency: offerData.currency || 'INR',
-                    availability: offerData.availability || 'in_stock',
-                    isSample: false,
-                    dataStatus: 'live',
-                    lastStatus: 'ok',
-                    lastSuccessAt: new Date(),
-                  },
-                  { upsert: true, new: true, setDefaultsOnInsert: true }
-                );
+              if (apifyRes && Array.isArray(apifyRes.products) && apifyRes.products.length > 0) {
+                const liveItems = [];
+                for (const item of apifyRes.products) {
+                  try {
+                    const canonicalKey = item.canonicalKey || `apify-${item.sourceProvider || retailer}-${item.externalId}`.toLowerCase();
+                    const persistedProduct = await Product.findOneAndUpdate(
+                      { canonicalKey },
+                      {
+                        title: item.title,
+                        brand: item.brand,
+                        model: item.model,
+                        variant: item.variant,
+                        category: item.category || (category && category !== 'all' ? category : 'electronics'),
+                        description: item.description,
+                        imageUrl: item.imageUrl,
+                        sourceProvider: 'apify',
+                        externalId: item.externalId,
+                        sourceUrl: item.sourceUrl,
+                        dataStatus: 'live',
+                      },
+                      { upsert: true, new: true, setDefaultsOnInsert: true }
+                    );
 
-                item.id = persistedProduct._id.toString();
-                item.offers = [toOfferSummary(persistedOffer)];
-                liveItems.push(item);
+                    const offerData = item.offers?.[0];
+                    if (offerData && persistedProduct) {
+                      const persistedOffer = await Offer.findOneAndUpdate(
+                        { provider: 'apify', externalProductId: String(offerData.externalProductId) },
+                        {
+                          productId: persistedProduct._id,
+                          retailer: item.sourceProvider || retailer,
+                          title: offerData.title || item.title,
+                          productUrl: offerData.productUrl || item.sourceUrl,
+                          priceInPaise: offerData.priceInPaise,
+                          originalPrice: offerData.originalPrice,
+                          originalCurrency: offerData.originalCurrency,
+                          currency: offerData.currency || 'INR',
+                          crossCurrencyComparable: offerData.crossCurrencyComparable ?? (offerData.currency === 'INR'),
+                          availability: offerData.availability || 'in_stock',
+                          isSample: false,
+                          dataStatus: 'live',
+                          lastStatus: 'ok',
+                          lastSuccessAt: new Date(),
+                        },
+                        { upsert: true, new: true, setDefaultsOnInsert: true }
+                      );
+
+                      item.id = persistedProduct._id.toString();
+                      item.canonicalKey = canonicalKey;
+                      item.offers = [toOfferSummary(persistedOffer)];
+                      liveItems.push(item);
+                    }
+                  } catch (persistErr) {
+                    console.warn('[search] Failed to persist Apify live item:', persistErr.message);
+                  }
+                }
+                return liveItems;
               }
-            } catch (persistErr) {
-              console.warn('[search] Failed to persist Apify live item:', persistErr.message);
+            } catch (err) {
+              console.warn('[search] Apify live search error:', err.message);
             }
-          }
-
-          // Prepend genuine live products so they rank prominently above sample data
-          combined = liveItems.concat(combined);
-        }
-      } catch (apifyErr) {
-        console.warn('[search] Apify live search error:', apifyErr.message);
+            return [];
+          })()
+        );
       }
     }
-  }
 
-  // 2b. Query eBay Browse API when targeted or when configured alongside live retailers
-  const isEbayTargeted =
-    providerFilter === 'ebay' ||
-    (providerFilter === 'live' && req.query.retailer === 'ebay') ||
-    (providerFilter === 'all' && ebayProvider.isConfigured() && process.env.NODE_ENV !== 'test');
-
-  if (isEbayTargeted && q && Product.db?.readyState === 1 && ebayProvider.isConfigured()) {
-    try {
-      const ebayRes = await ebayProvider.searchProducts(q, { limit: 10 });
-      if (ebayRes && Array.isArray(ebayRes.products) && ebayRes.products.length > 0) {
-        const ebayItems = [];
-        for (const item of ebayRes.products) {
+    // 3. eBay Browse API Discovery (Official eBay Marketplace)
+    if (shouldQueryEbay && ebayProvider.isConfigured()) {
+      discoveryPromises.push(
+        (async () => {
           try {
-            const canonicalKey = item.canonicalKey || `ebay-${item.externalId}`.toLowerCase();
-            const persistedProduct = await Product.findOneAndUpdate(
-              { canonicalKey },
-              {
-                title: item.title,
-                brand: item.brand,
-                model: item.model,
-                variant: item.variant,
-                category: item.category || 'marketplace',
-                description: item.description,
-                imageUrl: item.imageUrl,
-                sourceProvider: 'ebay',
-                externalId: item.externalId,
-                sourceUrl: item.sourceUrl,
-                dataStatus: item.dataStatus || 'live',
-              },
-              { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
+            const ebayRes = await ebayProvider.searchProducts(effectiveQuery, { limit: 8 });
+            if (ebayRes && Array.isArray(ebayRes.products) && ebayRes.products.length > 0) {
+              const ebayItems = [];
+              for (const item of ebayRes.products) {
+                try {
+                  const canonicalKey = item.canonicalKey || `ebay-${item.externalId}`.toLowerCase();
+                  const persistedProduct = await Product.findOneAndUpdate(
+                    { canonicalKey },
+                    {
+                      title: item.title,
+                      brand: item.brand,
+                      model: item.model,
+                      variant: item.variant,
+                      category: item.category || 'marketplace',
+                      description: item.description,
+                      imageUrl: item.imageUrl,
+                      sourceProvider: 'ebay',
+                      externalId: item.externalId,
+                      sourceUrl: item.sourceUrl,
+                      dataStatus: item.dataStatus || 'live',
+                    },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                  );
 
-            const offerData = item.offers?.[0];
-            if (offerData && persistedProduct) {
-              const persistedOffer = await Offer.findOneAndUpdate(
-                { provider: 'ebay', externalProductId: String(offerData.externalProductId) },
-                {
-                  productId: persistedProduct._id,
-                  retailer: 'ebay',
-                  title: offerData.title || item.title,
-                  productUrl: offerData.productUrl || item.sourceUrl,
-                  priceInPaise: offerData.priceInPaise,
-                  originalPrice: offerData.originalPrice,
-                  originalCurrency: offerData.originalCurrency,
-                  currency: offerData.currency || 'USD',
-                  crossCurrencyComparable: offerData.crossCurrencyComparable ?? false,
-                  availability: offerData.availability || 'in_stock',
-                  isSample: offerData.isSample ?? false,
-                  dataStatus: offerData.dataStatus || 'live',
-                  lastStatus: 'ok',
-                  lastSuccessAt: new Date(),
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-              );
+                  const offerData = item.offers?.[0];
+                  if (offerData && persistedProduct) {
+                    const persistedOffer = await Offer.findOneAndUpdate(
+                      { provider: 'ebay', externalProductId: String(offerData.externalProductId) },
+                      {
+                        productId: persistedProduct._id,
+                        retailer: 'ebay',
+                        title: offerData.title || item.title,
+                        productUrl: offerData.productUrl || item.sourceUrl,
+                        priceInPaise: offerData.priceInPaise,
+                        originalPrice: offerData.originalPrice,
+                        originalCurrency: offerData.originalCurrency,
+                        currency: offerData.currency || 'USD',
+                        crossCurrencyComparable: offerData.crossCurrencyComparable ?? false,
+                        availability: offerData.availability || 'in_stock',
+                        isSample: offerData.isSample ?? false,
+                        dataStatus: offerData.dataStatus || 'live',
+                        lastStatus: 'ok',
+                        lastSuccessAt: new Date(),
+                      },
+                      { upsert: true, new: true, setDefaultsOnInsert: true }
+                    );
 
-              item.id = persistedProduct._id.toString();
-              item.offers = [toOfferSummary(persistedOffer)];
-              ebayItems.push(item);
+                    item.id = persistedProduct._id.toString();
+                    item.canonicalKey = canonicalKey;
+                    item.offers = [toOfferSummary(persistedOffer)];
+                    ebayItems.push(item);
+                  }
+                } catch (persistErr) {
+                  console.warn('[search] Failed to persist eBay item:', persistErr.message);
+                }
+              }
+              return ebayItems;
             }
-          } catch (persistErr) {
-            console.warn('[search] Failed to persist eBay item:', persistErr.message);
+          } catch (err) {
+            console.warn('[search] eBay live search error:', err.message);
           }
+          return [];
+        })()
+      );
+    }
+
+    if (discoveryPromises.length > 0) {
+      const settledResults = await Promise.allSettled(discoveryPromises);
+      const newlyDiscovered = [];
+
+      for (const res of settledResults) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          newlyDiscovered.push(...res.value);
         }
-        combined = ebayItems.concat(combined);
       }
-    } catch (ebayErr) {
-      console.warn('[search] eBay search error:', ebayErr.message);
+
+      if (newlyDiscovered.length > 0) {
+        // Prepend newly discovered items, avoiding duplicate canonical keys
+        const seenKeys = new Set(newlyDiscovered.map((item) => item.canonicalKey || item.id));
+        const filteredDb = combined.filter((item) => !seenKeys.has(item.canonicalKey || item.id));
+        combined = newlyDiscovered.concat(filteredDb);
+      }
     }
   }
 
-  // 3. Query DummyJSON external catalog for discovery ONLY when explicitly requested or in test mode
-  const shouldQueryDummyJson =
-    providerFilter === 'dummyjson' ||
-    providerFilter === 'sample' ||
-    (process.env.NODE_ENV === 'test' && (providerFilter === 'all' || providerFilter === 'dummyjson'));
-
-  if (shouldQueryDummyJson) {
-    try {
-      const dummyRes = await dummyjsonProvider.searchProducts(q, { limit: 12 });
-      if (dummyRes && Array.isArray(dummyRes.products)) {
-        let dummyItems = dummyRes.products;
-        if (category && category !== 'all') {
-          dummyItems = dummyItems.filter(
-            (p) => p.category?.toLowerCase() === category.toLowerCase()
-          );
-        }
-
-        // Persist external items to MongoDB so users can track them in watchlist and configure alerts
-        for (const item of dummyItems) {
-          try {
-            const canonicalKey = item.canonicalKey || `dummyjson-${item.externalId}`;
-            const persistedProduct = await Product.findOneAndUpdate(
-              { canonicalKey },
-              {
-                title: item.title,
-                brand: item.brand,
-                model: item.model,
-                variant: item.variant,
-                category: item.category || 'general',
-                description: item.description,
-                imageUrl: item.imageUrl,
-                sourceProvider: 'dummyjson',
-                externalId: item.externalId,
-                sourceUrl: item.sourceUrl,
-                dataStatus: 'sample', // Explicitly keep sample data labeled as sample
-              },
-              { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-
-            // Persist associated offer
-            const offerData = item.offers?.[0];
-            if (offerData && persistedProduct) {
-              const persistedOffer = await Offer.findOneAndUpdate(
-                { provider: 'dummyjson', externalProductId: String(offerData.externalProductId) },
-                {
-                  productId: persistedProduct._id,
-                  retailer: 'dummyjson',
-                  title: offerData.title || item.title,
-                  productUrl: offerData.productUrl || item.sourceUrl,
-                  priceInPaise: offerData.priceInPaise,
-                  originalPrice: offerData.originalPrice,
-                  originalCurrency: offerData.originalCurrency,
-                  currency: offerData.currency || 'INR',
-                  availability: offerData.availability || 'in_stock',
-                  isSample: true,
-                  dataStatus: 'sample',
-                  lastStatus: 'ok',
-                  lastSuccessAt: new Date(),
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-              );
-
-              // Replace ephemeral in-memory IDs with genuine persisted MongoDB ObjectIds
-              item.id = persistedProduct._id.toString();
-              item.offers = [toOfferSummary(persistedOffer)];
-            }
-          } catch (persistErr) {
-            console.warn('[search] Failed to persist DummyJSON item:', persistErr.message);
-          }
-        }
-
-        combined = combined.concat(dummyItems);
-      }
-    } catch (err) {
-      console.warn('[search] DummyJSON discovery error:', err.message);
-    }
+  if (hasSpecificRetailer) {
+    combined = combined.filter((item) =>
+      item.sourceProvider === retailerFilter ||
+      item.offers?.some((o) => o.retailer === retailerFilter || o.provider === retailerFilter)
+    );
   }
 
-  // 4. Query mock.shop optional storefront if requested or matching apparel
-  if (providerFilter === 'mockshop') {
-    try {
-      const mockRes = await mockshopProvider.searchProducts(q, { limit: 6 });
-      if (mockRes && Array.isArray(mockRes.products)) {
-        for (const item of mockRes.products) {
-          try {
-            const canonicalKey = item.canonicalKey || `mockshop-${item.externalId}`;
-            const persistedProduct = await Product.findOneAndUpdate(
-              { canonicalKey },
-              {
-                title: item.title,
-                brand: item.brand,
-                model: item.model,
-                variant: item.variant,
-                category: item.category || 'apparel',
-                description: item.description,
-                imageUrl: item.imageUrl,
-                sourceProvider: 'mockshop',
-                externalId: item.externalId,
-                sourceUrl: item.sourceUrl,
-                dataStatus: 'sample',
-              },
-              { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-
-            const offerData = item.offers?.[0];
-            if (offerData && persistedProduct) {
-              const persistedOffer = await Offer.findOneAndUpdate(
-                { provider: 'mockshop', externalProductId: String(offerData.externalProductId) },
-                {
-                  productId: persistedProduct._id,
-                  retailer: 'mockshop',
-                  title: offerData.title || item.title,
-                  productUrl: offerData.productUrl || item.sourceUrl,
-                  priceInPaise: offerData.priceInPaise,
-                  originalPrice: offerData.originalPrice,
-                  originalCurrency: offerData.originalCurrency,
-                  currency: offerData.currency || 'INR',
-                  availability: offerData.availability || 'in_stock',
-                  isSample: true,
-                  dataStatus: 'sample',
-                  lastStatus: 'ok',
-                  lastSuccessAt: new Date(),
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-              );
-
-              item.id = persistedProduct._id.toString();
-              item.offers = [toOfferSummary(persistedOffer)];
-            }
-          } catch (persistErr) {
-            console.warn('[search] Failed to persist mock.shop item:', persistErr.message);
-          }
-        }
-        combined = combined.concat(mockRes.products);
-      }
-    } catch (err) {
-      console.warn('[search] mock.shop error:', err.message);
-    }
-  }
-
-  // 5. Similar / Alternative products fallback when 0 exact products are found
+  // 4. Similar / Alternative products fallback when 0 exact products are found
   let alternatives = [];
-  if (combined.length === 0 && (q || category)) {
+  if (mongoose.connection.readyState === 1 && combined.length === 0 && (q || category)) {
     try {
       const altCatRegex = category && CATEGORY_MAP[category.toLowerCase()]
         ? CATEGORY_MAP[category.toLowerCase()]
@@ -433,8 +347,8 @@ export const searchProducts = asyncHandler(async (req, res) => {
         category: p.category ?? 'electronics',
         description: p.description ?? '',
         imageUrl: p.imageUrl ?? null,
-        sourceProvider: p.sourceProvider || 'fixture',
-        dataStatus: p.dataStatus || 'sample',
+        sourceProvider: p.sourceProvider || 'live',
+        dataStatus: p.dataStatus || 'live',
         isAlternative: true,
         offers: altOffersMap.get(p._id.toString()) ?? [],
       }));
@@ -450,69 +364,34 @@ export const searchProducts = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Retrieves a single product by MongoDB _id or canonicalKey.
+ * External sample catalog calls have been completely removed.
+ */
 export const getProductById = asyncHandler(async (req, res) => {
   const { productId } = req.params;
 
-  // 1. Check if ID belongs to DummyJSON catalog
-  if (productId.startsWith('dummyjson-')) {
-    const dummyProduct = await dummyjsonProvider.getProductById(productId);
-    if (!dummyProduct) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Sample product not found in DummyJSON catalog.' },
-      });
-    }
-    return res.status(200).json({
-      success: true,
-      data: {
-        product: {
-          id: dummyProduct.id,
-          title: dummyProduct.title,
-          brand: dummyProduct.brand ?? null,
-          model: dummyProduct.model ?? null,
-          variant: dummyProduct.variant ?? null,
-          category: dummyProduct.category ?? 'general',
-          description: dummyProduct.description ?? '',
-          imageUrl: dummyProduct.imageUrl ?? null,
-          images: dummyProduct.images ?? [],
-          sourceProvider: dummyProduct.sourceProvider,
-          sourceUrl: dummyProduct.sourceUrl,
-          dataStatus: dummyProduct.dataStatus,
-        },
-        offers: (dummyProduct.offers || []).map(toOfferSummary),
-      },
-    });
-  }
+  let product = null;
 
-  // 2. Check if ID belongs to mock.shop catalog
-  if (productId.startsWith('mockshop-')) {
-    const cleanId = productId.replace(/^mockshop-/, '');
-    const mockRes = await mockshopProvider.searchProducts(cleanId, { limit: 1 });
-    const mockProduct = mockRes?.products?.[0];
-    if (!mockProduct) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Fictional item not found in mock.shop catalog.' },
-      });
+  if (mongoose.connection.readyState === 1) {
+    // 1. Try finding by ObjectId if valid
+    if (mongoose.Types.ObjectId.isValid(productId)) {
+      try {
+        product = await Product.findById(productId);
+      } catch (_) {}
     }
-    return res.status(200).json({
-      success: true,
-      data: {
-        product: mockProduct,
-        offers: mockProduct.offers.map(toOfferSummary),
-      },
-    });
-  }
 
-  // 3. Fallback to MongoDB Product lookup
-  let product;
-  try {
-    product = await Product.findById(productId);
-  } catch (err) {
-    return res.status(404).json({
-      success: false,
-      error: { code: 'NOT_FOUND', message: 'Product not found.' },
-    });
+    // 2. Fallback to lookup by canonicalKey or externalId for persisted items
+    if (!product) {
+      try {
+        product = await Product.findOne({
+          $or: [
+            { canonicalKey: productId.toLowerCase() },
+            { externalId: productId },
+          ],
+        });
+      } catch (_) {}
+    }
   }
 
   if (!product) {
@@ -522,7 +401,9 @@ export const getProductById = asyncHandler(async (req, res) => {
     });
   }
 
-  const offers = await Offer.find({ productId: product._id });
+  const offers = mongoose.connection.readyState === 1
+    ? await Offer.find({ productId: product._id })
+    : [];
   return res.status(200).json({
     success: true,
     data: {
@@ -535,8 +416,8 @@ export const getProductById = asyncHandler(async (req, res) => {
         category: product.category ?? 'electronics',
         description: product.description ?? '',
         imageUrl: product.imageUrl ?? null,
-        sourceProvider: product.sourceProvider || 'fixture',
-        dataStatus: product.dataStatus || 'sample',
+        sourceProvider: product.sourceProvider || 'live',
+        dataStatus: product.dataStatus || 'live',
       },
       offers: offers.map(toOfferSummary),
     },
@@ -545,7 +426,7 @@ export const getProductById = asyncHandler(async (req, res) => {
 
 export const getAutocomplete = asyncHandler(async (req, res) => {
   const q = (req.query.q || '').trim();
-  if (!q || q.length < 2) {
+  if (!q || q.length < 2 || mongoose.connection.readyState !== 1) {
     return res.status(200).json({ success: true, data: { suggestions: [] } });
   }
 
@@ -587,6 +468,10 @@ export const getCategories = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Reports status of product sources (Apify & eBay).
+ * Sample dummy catalogs have been removed from active discovery.
+ */
 export const getProviderStatus = asyncHandler(async (req, res) => {
   const ebayConfigured = ebayProvider.isConfigured();
   const apifyConfig = apifyProvider.getApifyConfig();
@@ -607,65 +492,19 @@ export const getProviderStatus = asyncHandler(async (req, res) => {
       name: 'eBay Browse API',
       type: 'live',
       status: ebayConfigured ? 'configured' : 'unconfigured',
-      description: 'Official eBay Marketplace Browse API (OAuth 2.0 application client credentials required).',
+      description: 'Official eBay Marketplace Browse API (OAuth 2.0 application client credentials).',
       requiresAuth: true,
       isConfigured: ebayConfigured,
     },
     {
       id: 'fixture',
-      name: 'Fixture Dataset',
+      name: 'Fixture Dataset (Automated Testing Only)',
       type: 'sample',
       status: 'active',
-      description: 'Deterministic multi-retailer test fixtures isolated for automated testing.',
+      description: 'Deterministic test fixtures strictly isolated for local automated testing suites.',
       requiresAuth: false,
       isConfigured: true,
-    },
-    {
-      id: 'dummyjson',
-      name: 'DummyJSON Catalog',
-      type: 'sample',
-      status: 'active',
-      description: 'Secondary sample catalog isolated from production live search and categories.',
-      requiresAuth: false,
-      isConfigured: true,
-      mode: 'isolated_sample',
-    },
-    {
-      id: 'mockshop',
-      name: 'Shopify mock.shop',
-      type: 'sample',
-      status: 'active',
-      description: 'Fictional headless storefront isolated from production live search.',
-      requiresAuth: false,
-      isConfigured: true,
-      mode: 'isolated_sample',
-    },
-    {
-      id: 'flipkart',
-      name: 'Flipkart Affiliate API (Legacy)',
-      type: 'live',
-      status: 'standby',
-      description: 'Official retailer feed adapter (routed to fixture fallback until verified).',
-      requiresAuth: true,
-      isConfigured: Boolean(process.env.FLIPKART_AFFILIATE_ID && process.env.FLIPKART_AFFILIATE_TOKEN),
-    },
-    {
-      id: 'amazon',
-      name: 'Amazon India (Legacy Mock)',
-      type: 'sample',
-      status: 'mock_only',
-      description: 'Compliance policy mock; live Amazon queries are routed via Apify.',
-      requiresAuth: false,
-      isConfigured: true,
-    },
-    {
-      id: 'scrapling',
-      name: 'Scrapling Worker (Testbed)',
-      type: 'live',
-      status: 'standby',
-      description: 'Isolated Python Scrapling worker for authorized domain extraction with SSRF protection.',
-      requiresAuth: false,
-      isConfigured: Boolean(process.env.SCRAPLING_WORKER_URL),
+      mode: 'test_only',
     },
   ];
 

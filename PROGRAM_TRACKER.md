@@ -895,4 +895,37 @@ PriceRadar/
   - Vite client production build: 112 modules transformed cleanly in 971ms.
   - Health endpoint: `{"status":"ok","database":"connected"}`.
   - Diagnostics API: 19 passed, 0 failed, 1 warning (Scrapling standby), 1 not configured (eBay awaiting developer keys).
-- **Next Task:** Final git checkpoint, commit, push, and comprehensive 14-point report delivery.
+- **Next Task:** Apify + eBay Final Integration, Dummy Source Removal & Diagnostics Hardening.
+
+---
+
+### Task 17: Final Integration — Apify + eBay Only, Complete Removal of Dummy Sources and Verification
+- **Date & Time:** 2026-10-16 23:15 IST
+- **Phase:** Production Source Hardening, eBay Browse API Integration & Dummy Source Removal
+- **Files Modified / Created:**
+  - `server/src/controllers/productsController.js` (Removed DummyJSON and mock.shop from active search, product discovery, and provider status; unified concurrent discovery orchestration using Apify and eBay; implemented database fallback for persisted items; enforced currency preservation and cross-currency protection)
+  - `server/src/controllers/diagnosticsController.js` (Hardened Product Sources category to feature Apify and eBay only; accurately reports sandbox OAuth status, Browse API status, and production promotion advice)
+  - `client/src/pages/SearchPage.jsx` (Removed "Sample Catalog" toggle; unified active sources filter dropdown to: All Sources, Amazon India, Flipkart, Meesho, eBay Marketplace; updated results count)
+  - `server/tests/multiProviderArchitecture.test.js` (Updated tests for configured eBay Browse provider, verified removal of DummyJSON from provider status, and tested unpersisted 404 behavior)
+  - `server/tests/diagnostics.test.js` (Adjusted full diagnostics test timeout to 25s for live eBay OAuth token exchange)
+  - `server/tests/notificationFlow.test.js` (Hardened setup hook timeout for stable remote MongoDB Atlas connectivity)
+  - `PROGRAM_TRACKER.md` (Updated development ledger)
+- **What Changed:**
+  - Configured eBay application credentials safely in `server/.env` without exposing them in git or client bundles.
+  - Validated eBay Browse API OAuth 2.0 handshake and live search: verified access to `https://api.sandbox.ebay.com/buy/browse/v1` returning genuine marketplace listings.
+  - Completely removed DummyJSON and mock.shop from production search, category listings, and user-facing UI.
+  - Established Apify (Amazon, Flipkart, Meesho) and eBay Browse API as the ONLY active product discovery sources.
+  - Ensured all 22 Jest test suites (218 tests) pass 100% green and Vite client builds in <1s.
+- **Commands Executed:**
+  ```powershell
+  npm --prefix server test
+  npm --prefix client run build
+  node -e "fetch('http://localhost:5000/api/diagnostics').then(r => r.json()).then(console.log)"
+  node -e "fetch('http://localhost:5000/api/products/search?q=samsung&retailer=ebay').then(r => r.json()).then(console.log)"
+  ```
+- **Tests Performed & Actual Results:**
+  - Jest Test Suites: 22/22 passed, 218/218 tests green.
+  - Vite client production build: 112 modules transformed in 920ms with 0 errors.
+  - Live eBay search: Successfully queried eBay sandbox, retrieved genuine Samsung listings, persisted to MongoDB Atlas, and preserved USD currency.
+  - System Diagnostics: 18 passed, 0 failed, 1 warning (eBay sandbox status), Category D features Apify and eBay only.
+- **Next Task:** Git commit, push, and delivery of 17-point final report.

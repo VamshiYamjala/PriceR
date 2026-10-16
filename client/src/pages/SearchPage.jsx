@@ -9,15 +9,13 @@ export default function SearchPage() {
 
   const queryParam = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category') || '';
-  const providerParam = searchParams.get('provider') || 'all';
-  const retailerParam = searchParams.get('retailer') || 'amazon';
+  const retailerParam = searchParams.get('retailer') || 'all';
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [products, setProducts] = useState([]);
   const [alternatives, setAlternatives] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | loading | success | empty | error
   const [sortBy, setSortBy] = useState('relevance'); // relevance | price_asc | price_desc
-  const [dataFilter, setDataFilter] = useState(providerParam); // all | live | sample
   const [retailer, setRetailer] = useState(retailerParam);
 
   // Autocomplete state
@@ -25,15 +23,14 @@ export default function SearchPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchBoxRef = useRef(null);
 
-  const runSearch = useCallback(async (q, cat, prov, ret) => {
+  const runSearch = useCallback(async (q, cat, ret) => {
     setStatus('loading');
     setShowSuggestions(false);
     try {
       const data = await api.searchProducts({
         q,
         category: cat || undefined,
-        provider: prov !== 'all' ? prov : undefined,
-        retailer: prov === 'live' ? ret : undefined,
+        retailer: ret && ret !== 'all' ? ret : undefined,
       });
       const results = data?.products || [];
       const alts = data?.alternatives || [];
@@ -47,10 +44,9 @@ export default function SearchPage() {
 
   useEffect(() => {
     setInputValue(queryParam);
-    setDataFilter(providerParam);
     setRetailer(retailerParam);
-    runSearch(queryParam, categoryParam, providerParam, retailerParam);
-  }, [queryParam, categoryParam, providerParam, retailerParam, runSearch]);
+    runSearch(queryParam, categoryParam, retailerParam);
+  }, [queryParam, categoryParam, retailerParam, runSearch]);
 
   // Debounced search autocomplete
   useEffect(() => {
@@ -95,8 +91,7 @@ export default function SearchPage() {
     const newParams = {};
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (categoryParam) newParams.category = categoryParam;
-    if (dataFilter !== 'all') newParams.provider = dataFilter;
-    if (dataFilter === 'live') newParams.retailer = retailer;
+    if (retailer !== 'all') newParams.retailer = retailer;
     setSearchParams(newParams);
   }
 
@@ -106,8 +101,7 @@ export default function SearchPage() {
     const newParams = {};
     newParams.q = suggestion.title;
     if (categoryParam) newParams.category = categoryParam;
-    if (dataFilter !== 'all') newParams.provider = dataFilter;
-    if (dataFilter === 'live') newParams.retailer = retailer;
+    if (retailer !== 'all') newParams.retailer = retailer;
     setSearchParams(newParams);
   }
 
@@ -115,18 +109,7 @@ export default function SearchPage() {
     const newParams = {};
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (newCat && newCat !== 'all') newParams.category = newCat;
-    if (dataFilter !== 'all') newParams.provider = dataFilter;
-    if (dataFilter === 'live') newParams.retailer = retailer;
-    setSearchParams(newParams);
-  }
-
-  function handleFilterChange(filter) {
-    setDataFilter(filter);
-    const newParams = {};
-    if (inputValue.trim()) newParams.q = inputValue.trim();
-    if (categoryParam) newParams.category = categoryParam;
-    if (filter !== 'all') newParams.provider = filter;
-    if (filter === 'live') newParams.retailer = retailer;
+    if (retailer !== 'all') newParams.retailer = retailer;
     setSearchParams(newParams);
   }
 
@@ -135,23 +118,12 @@ export default function SearchPage() {
     const newParams = {};
     if (inputValue.trim()) newParams.q = inputValue.trim();
     if (categoryParam) newParams.category = categoryParam;
-    if (dataFilter !== 'all') newParams.provider = dataFilter;
-    newParams.retailer = newRet;
+    if (newRet !== 'all') newParams.retailer = newRet;
     setSearchParams(newParams);
   }
 
   // Filter and sort products on client
   let displayedProducts = [...products];
-
-  if (dataFilter === 'live') {
-    displayedProducts = displayedProducts.filter(
-      (p) => p.dataStatus === 'live' && !p.isSample
-    );
-  } else if (dataFilter === 'sample') {
-    displayedProducts = displayedProducts.filter(
-      (p) => p.dataStatus === 'sample' || p.isSample
-    );
-  }
 
   if (sortBy === 'price_asc') {
     displayedProducts.sort((a, b) => {
@@ -282,46 +254,22 @@ export default function SearchPage() {
             })}
           </div>
 
-          {/* Provenance Selector (Live vs Sample vs All) */}
+          {/* Active Retailer / Product Source Selector */}
           <div className="d-flex align-items-center gap-2">
-            <div className="btn-group btn-group-sm" role="group">
-              <button
-                type="button"
-                className={`btn ${dataFilter === 'all' ? 'btn-forest' : 'btn-outline-forest'}`}
-                onClick={() => handleFilterChange('all')}
-              >
-                All Sources
-              </button>
-              <button
-                type="button"
-                className={`btn ${dataFilter === 'live' ? 'btn-forest' : 'btn-outline-forest'}`}
-                onClick={() => handleFilterChange('live')}
-              >
-                ● Live Retailers
-              </button>
-              <button
-                type="button"
-                className={`btn ${dataFilter === 'sample' ? 'btn-forest' : 'btn-outline-forest'}`}
-                onClick={() => handleFilterChange('sample')}
-              >
-                Sample Catalog
-              </button>
-            </div>
-
-            {dataFilter === 'live' && (
-              <select
-                className="form-select form-select-sm"
-                value={retailer}
-                onChange={(e) => handleRetailerChange(e.target.value)}
-                style={{ width: 'auto', borderRadius: 'var(--pr-radius-md)' }}
-                aria-label="Filter by retailer"
-              >
-                <option value="amazon">Amazon India</option>
-                <option value="flipkart">Flipkart</option>
-                <option value="meesho">Meesho</option>
-                <option value="ebay">eBay Marketplace</option>
-              </select>
-            )}
+            <span className="small text-muted fw-medium d-none d-sm-inline">Source:</span>
+            <select
+              className="form-select form-select-sm"
+              value={retailer}
+              onChange={(e) => handleRetailerChange(e.target.value)}
+              style={{ width: 'auto', borderRadius: 'var(--pr-radius-md)', fontWeight: 500 }}
+              aria-label="Filter by retailer or product source"
+            >
+              <option value="all">All Sources (Amazon, Flipkart, Meesho, eBay)</option>
+              <option value="amazon">Amazon India</option>
+              <option value="flipkart">Flipkart</option>
+              <option value="meesho">Meesho</option>
+              <option value="ebay">eBay Marketplace</option>
+            </select>
           </div>
         </div>
 
@@ -330,7 +278,7 @@ export default function SearchPage() {
           <div className="small text-muted font-monospace">
             {status === 'loading'
               ? 'Searching verified databases…'
-              : `${displayedProducts.length} ${dataFilter === 'sample' ? 'sample products' : 'products found'}`}
+              : `${displayedProducts.length} ${displayedProducts.length === 1 ? 'product' : 'products'} found`}
           </div>
 
           <div className="d-flex align-items-center gap-2">

@@ -341,40 +341,6 @@ export async function getSourcesDiagnostics() {
     })
   );
 
-  // Scrapling Worker
-  checks.push(
-    await runCheck(async () => {
-      const isAvailable = await scraplingProvider.isWorkerAvailable();
-      return {
-        id: 'src_scrapling_worker',
-        name: 'Scrapling Python Extraction Worker',
-        component: 'Scrapling Worker Adapter',
-        status: isAvailable ? 'PASS' : 'WARNING',
-        expected: 'FastAPI worker responding on http://127.0.0.1:8000/health',
-        actual: isAvailable ? 'Online & Healthy' : 'Worker not running on 127.0.0.1:8000 (Standby mode)',
-        error: isAvailable ? null : 'Local Python worker offline',
-        likelyCause: isAvailable ? null : 'Python service worker/main.py is not actively started',
-        recommendation: isAvailable ? 'None' : 'If web testbed extraction is needed, run: python worker/main.py',
-      };
-    })
-  );
-
-  // Sample Catalogs Isolation (DummyJSON & mock.shop)
-  checks.push(
-    await runCheck(async () => {
-      return {
-        id: 'src_sample_isolation',
-        name: 'Sample Catalogs Isolation (DummyJSON & mock.shop)',
-        component: 'Catalog Governance',
-        status: 'PASS',
-        expected: 'Sample catalogs excluded from live user search and categories',
-        actual: 'DummyJSON & mock.shop strictly isolated from normal live queries (accessible only when provider=sample)',
-        error: null,
-        recommendation: 'None',
-      };
-    })
-  );
-
   return checks;
 }
 
