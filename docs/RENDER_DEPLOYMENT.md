@@ -25,7 +25,7 @@ PriceRadar uses a decoupled architecture deployed as two separate services on Re
                │                               │
                ▼                               ▼
        MongoDB Atlas Cluster            GitHub Actions Cron
-    (Allowlist: 0.0.0.0/0)              (Runs every 4 hours)
+    (Allowlist: Render Outbound IPs)    (Runs every 4 hours)
 ```
 
 ---
@@ -35,25 +35,33 @@ PriceRadar uses a decoupled architecture deployed as two separate services on Re
 Before creating services on Render, ensure you have:
 1. A [Render account](https://render.com/).
 2. A [MongoDB Atlas](https://www.mongodb.com/atlas) cluster with Network Access configured (see Section 3).
-3. Access to your third-party API accounts:
-   - Apify API Token ([apify.com](https://apify.com))
-   - Brevo API Key ([brevo.com](https://brevo.com))
-   - Telegram Bot Token ([t.me/BotFather](https://t.me/BotFather))
-   - eBay Developer App credentials ([developer.ebay.com](https://developer.ebay.com))
+3. Access to your third-party API accounts (optional, required only for specific features):
+   - Apify API Token ([apify.com](https://apify.com)) — for live Amazon/Flipkart/Meesho scraping
+   - Brevo API Key ([brevo.com](https://brevo.com)) — for transactional email alerts & OTP
+   - Telegram Bot Token ([t.me/BotFather](https://t.me/BotFather)) — for instant Telegram alerts
+   - eBay Developer App credentials ([developer.ebay.com](https://developer.ebay.com)) — for eBay Browse API
 
 ---
 
-## 3. MongoDB Atlas Configuration (Crucial)
+## 3. MongoDB Atlas Network Access Configuration
 
-Render Web Services (especially Free tier) use dynamically assigned outbound IP addresses that change across deployments and container restarts.
+To allow your Render backend to connect to MongoDB Atlas securely:
 
-1. Log into your **MongoDB Atlas Console**.
-2. Under **Security**, click **Network Access**.
-3. Click **+ Add IP Address**.
-4. Click **Allow Access from Anywhere** (`0.0.0.0/0`).
-5. Confirm and save the change.
+### Recommended Approach: Authorize Render's Regional Outbound IPs
+Render publishes outbound IP addresses for each deployment region (e.g. Oregon, Frankfurt, Singapore, Ohio).
 
-> **Security Note:** Your database remains secured by your strong database user credentials and TLS encryption. Ensure your database password does not contain unescaped special characters (use standard URI encoding if needed).
+1. Identify the **Region** where you create your Render Web Service (e.g. `Oregon, USA` or `Singapore`).
+2. Consult Render's official Outbound IP list for your region in [Render Outbound IP Documentation](https://render.com/docs/ip-addresses) or under your Web Service's **Settings** > **Outbound IP Addresses**.
+3. Log into your **MongoDB Atlas Console**.
+4. Under **Security**, click **Network Access**.
+5. Click **+ Add IP Address**.
+6. Add the outbound CIDR blocks for your selected Render region with a descriptive comment (e.g. `Render Oregon Outbound 1`).
+7. Confirm and save the changes.
+
+### Honest Limitations & Troubleshooting Notes
+- **Shared Regional Pools:** On Render Free and Starter tiers, outgoing traffic routes through shared regional outbound IP pools. Render provides the list of CIDR blocks, and all blocks for that region should be added to Atlas.
+- **Atlas M0 Entry Limit:** MongoDB Atlas Free Tier (M0) allows a maximum of 50 IP whitelist entries. Render's regional list typically requires only a few CIDR entries, which fits comfortably within this quota.
+- **Temporary Troubleshooting Fallback:** If Render migrates your container to a host outside the standard list, or if regional routing causes intermittent drops during initial setup, you may temporarily use `0.0.0.0/0` strictly to verify database connectivity. Once connectivity is established, restrict access back to the specific Render outbound ranges.
 
 ---
 
@@ -65,7 +73,7 @@ Render Web Services (especially Free tier) use dynamically assigned outbound IP 
 3. Choose the branch: `main`.
 4. Configure the service settings:
    - **Name:** `priceradar-backend` (or a name of your choice)
-   - **Region:** Choose the region closest to your users or database (e.g., Singapore or Oregon)
+   - **Region:** Choose the region closest to your users or database (e.g., Oregon or Singapore)
    - **Root Directory:** `server`
    - **Environment:** `Node`
    - **Build Command:** `npm install`
@@ -74,36 +82,43 @@ Render Web Services (especially Free tier) use dynamically assigned outbound IP 
 5. Expand **Advanced**:
    - **Health Check Path:** `/api/health`
    - **Auto-Deploy:** `Yes`
+   - **Port Configuration:** Render automatically injects `process.env.PORT` (typically `10000`). The server binds dynamically (`process.env.PORT || 5000`). You do **not** need to hardcode a port.
 
 ### Step 2: Configure Backend Environment Variables
-In the **Environment** tab of your backend service, add the following variables:
 
-| Variable Name | Value / Instructions |
-|---|---|
-| `NODE_ENV` | `production` |
-| `PORT` | `10000` *(Render sets this automatically, but you can declare it explicitly)* |
-| `MONGODB_URI` | `mongodb+srv://<username>:<password>@<cluster>.mongodb.net/priceradar?retryWrites=true&w=majority` |
-| `CLIENT_ORIGIN` | `https://priceradar-frontend.onrender.com` *(Replace with your actual frontend Render URL after creating the static site)* |
-| `JWT_SECRET` | 32+ character random hex or base64 string *(Generate via: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)* |
-| `JWT_EXPIRES_IN` | `7d` |
-| `BREVO_API_KEY` | Your Brevo transactional email key (format: `xkeysib-...`) |
-| `EMAIL_FROM` | Verified sender email in your Brevo account |
-| `EMAIL_FROM_NAME` | `PriceRadar` |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token obtained from `@BotFather` |
-| `TELEGRAM_BOT_USERNAME` | Telegram bot handle (without `@`) |
-| `MONITOR_TRIGGER_SECRET` | Strong random secret string used by GitHub Actions to trigger the price monitor |
-| `ADMIN_DIAGNOSTIC_SECRET` | Optional/recommended strong secret string to unlock `/api/diagnostics` in production |
-| `MONITORING_ENABLED` | `false` *(Recommended on Render free tier to prevent idle container crashes; GitHub Actions triggers the monitor externally)* |
-| `APIFY_API_TOKEN` | Apify Personal API Token (format: `apify_api_...`) |
-| `APIFY_ACTOR_AMAZON` | `junglee/free-amazon-product-scraper` |
-| `APIFY_ACTOR_FLIPKART` | `shahidirfan/Flipkart-Product-Scraper` |
-| `APIFY_ACTOR_MEESHO` | `scrapeai/meesho-product-scraper` |
-| `APIFY_MAX_ITEMS` | `5` |
-| `APIFY_TIMEOUT_SECS` | `60` |
-| `EBAY_CLIENT_ID` | eBay Developer Client ID |
-| `EBAY_CLIENT_SECRET` | eBay Developer Client Secret |
-| `EBAY_ENV` | `SANDBOX` *(or `PRODUCTION`)* |
-| `EBAY_MARKETPLACE_ID` | `EBAY_IN` *(or `EBAY_US`)* |
+Environment variables are divided into **Core Startup Variables** (strictly required for server operation) and **Optional Feature Credentials** (needed only when enabling that specific integration).
+
+#### A. Core Startup Variables (Required for Application Startup)
+
+| Variable Name | Required | Purpose / Value |
+|---|---|---|
+| `NODE_ENV` | **Yes** | Set to `production`. Activates production security guards and suppresses internal stack traces in errors. |
+| `MONGODB_URI` | **Yes** | Your MongoDB Atlas connection URI (`mongodb+srv://<user>:<pwd>@cluster.mongodb.net/priceradar`). Required for database connection. |
+| `CLIENT_ORIGIN` | **Yes** | Full URL of the frontend Static Site (e.g. `https://priceradar-frontend.onrender.com`). Required for browser CORS validation. |
+| `JWT_SECRET` | **Yes** | 32+ character random hex string. Required for signing and verifying user authentication tokens. |
+
+#### B. Optional Feature Credentials (Feature-Specific)
+
+| Variable Name | Required | Default Behavior When Omitted | Purpose |
+|---|---|---|---|
+| `MONITOR_TRIGGER_SECRET` | For Monitoring | `POST /api/monitor/run` returns 401 | Shared secret used by GitHub Actions to trigger scheduled price checks. *(Cannot be used to access diagnostics).* |
+| `MONITORING_ENABLED` | Recommended | Defaults to `true` | Set to `false` on Render free tier to prevent idle container CPU waste. GitHub Actions triggers checks externally. |
+| `ADMIN_DIAGNOSTIC_SECRET` | No | `/api/diagnostics` returns 403 in production | Dedicated admin secret string. If omitted, diagnostics are 100% disabled in production. |
+| `BREVO_API_KEY` | For Email | Console warning; email alerts skipped | Brevo API key (`xkeysib-...`) for price drop emails and registration OTP delivery. |
+| `EMAIL_FROM` | For Email | Undefined | Verified sender email address configured in your Brevo account. |
+| `EMAIL_FROM_NAME` | No | `PriceRadar` | Display sender name on outgoing alert emails. |
+| `TELEGRAM_BOT_TOKEN` | For Telegram | Telegram listener skipped cleanly | Telegram bot token from `@BotFather` for instant alerts and account linking. |
+| `TELEGRAM_BOT_USERNAME` | No | Undefined | Bot handle used to generate deep-linking URLs in the frontend. |
+| `APIFY_API_TOKEN` | For Apify | Searches use DB/fixtures fallback | Apify Personal API token for live Amazon, Flipkart, and Meesho scrapers. |
+| `APIFY_ACTOR_AMAZON` | No | `junglee/free-amazon-product-scraper` | Amazon India scraper actor ID. |
+| `APIFY_ACTOR_FLIPKART` | No | `shahidirfan/Flipkart-Product-Scraper` | Flipkart scraper actor ID. |
+| `APIFY_ACTOR_MEESHO` | No | `scrapeai/meesho-product-scraper` | Meesho scraper actor ID. |
+| `APIFY_MAX_ITEMS` | No | `5` | Maximum search items to fetch per retailer query. |
+| `APIFY_TIMEOUT_SECS` | No | `60` | Apify Actor execution timeout in seconds. |
+| `EBAY_CLIENT_ID` | For eBay | eBay provider disabled; logged in status | eBay Developer App Client ID. |
+| `EBAY_CLIENT_SECRET` | For eBay | eBay provider disabled; logged in status | eBay Developer App Client Secret. |
+| `EBAY_ENV` | No | `sandbox` | Set to `sandbox` for testing or `production` for approved keys. Defaults safely to `sandbox`. |
+| `EBAY_MARKETPLACE_ID` | No | `EBAY_IN` (or `EBAY_US`) | Target marketplace identifier. |
 
 6. Click **Create Web Service** (or **Save Changes**).
 

@@ -9,17 +9,18 @@ const router = Router();
  * In development and test environments, diagnostics are fully available for testing and inspection.
  * In production, detailed diagnostics and provider-verification endpoints are disabled by default
  * to prevent leaking internal infrastructure, dependencies, or service topology.
- * Optional admin access in production requires a valid X-Diagnostic-Secret or X-Monitor-Secret header.
+ * Admin access in production requires a dedicated X-Diagnostic-Secret header matching ADMIN_DIAGNOSTIC_SECRET.
+ * MONITOR_TRIGGER_SECRET is strictly forbidden from unlocking diagnostics.
  */
 export function protectProductionDiagnostics(req, res, next) {
   if (process.env.NODE_ENV !== 'production') {
     return next();
   }
 
-  const providedSecret = req.headers['x-diagnostic-secret'] || req.headers['x-monitor-secret'];
-  const allowedSecret = process.env.ADMIN_DIAGNOSTIC_SECRET || process.env.MONITOR_TRIGGER_SECRET;
+  const providedSecret = req.headers['x-diagnostic-secret'];
+  const adminSecret = process.env.ADMIN_DIAGNOSTIC_SECRET;
 
-  if (allowedSecret && providedSecret && providedSecret === allowedSecret) {
+  if (adminSecret && providedSecret && providedSecret === adminSecret) {
     return next();
   }
 

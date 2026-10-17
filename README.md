@@ -283,7 +283,7 @@ PriceRadar is production-ready for deployment to Render as two decoupled service
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Health Check Path:** `/api/health` (returns HTTP 200 when MongoDB is connected, HTTP 503 when disconnected)
-   - **MongoDB Atlas Network Access:** Add `0.0.0.0/0` (Allow Access from Anywhere) because Render free tier instances use dynamic outbound IPs.
+   - **MongoDB Atlas Network Access:** Authorize Render Web Service regional outbound IP ranges in MongoDB Atlas Network Access (refer to deployment guide for details).
 
 2. **Frontend Static Site (`client` directory):**
    - **Environment:** Static Site

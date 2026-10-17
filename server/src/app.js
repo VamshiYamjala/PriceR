@@ -62,7 +62,7 @@ app.use('/api', (req, res, next) => {
       success: false,
       error: {
         code: 'DATABASE_DISCONNECTED',
-        message: 'Database is temporarily unreachable. If using MongoDB Atlas, please ensure your hosting environment IP or 0.0.0.0/0 is added to the Atlas IP Access List.',
+        message: 'Database is temporarily unreachable. If using MongoDB Atlas, please ensure your hosting environment outbound IP ranges are authorized in the Atlas Network Access list.',
       },
     });
   }

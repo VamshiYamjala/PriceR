@@ -128,5 +128,21 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
         process.env.NODE_ENV = originalEnv;
       }
     }, 25000);
+
+    it('should strictly reject access in production when X-Monitor-Secret is provided instead of X-Diagnostic-Secret', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.MONITOR_TRIGGER_SECRET = 'monitor-secret-123';
+      try {
+        const res = await request(app)
+          .get('/api/diagnostics')
+          .set('X-Monitor-Secret', 'monitor-secret-123');
+        expect(res.status).toBe(403);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.code).toBe('DIAGNOSTICS_DISABLED');
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+        delete process.env.MONITOR_TRIGGER_SECRET;
+      }
+    });
   });
 });

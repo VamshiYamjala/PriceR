@@ -49,7 +49,7 @@ async function verify() {
     } else if (err.message.includes('querySrv') || err.message.includes('ENOTFOUND')) {
       console.error('💡 Hint: Check cluster hostname or DNS connectivity.');
     } else if (err.message.includes('whitelist') || err.message.includes('not allowed')) {
-      console.error('💡 Hint: Check Network Access in MongoDB Atlas. Ensure 0.0.0.0/0 is added to IP Access List.');
+      console.error('💡 Hint: Check Network Access in MongoDB Atlas. Ensure your IP address or hosting outbound IP ranges are added to the Atlas IP Access List.');
     }
     process.exit(1);
   }
