@@ -10,10 +10,26 @@
  * @param {object} alert - Alert document or object
  * @param {number} currentPriceInPaise - latest observed price
  * @param {number|null} previousPriceInPaise - prior observed price
+ * @param {object} [options] - Optional evaluation options (e.g. { currency, targetCurrency })
  * @returns {{conditionMet: boolean, shouldNotify: boolean, shouldRearm: boolean, reason: string, dedupeKey: string}}
  */
-export function evaluateAlert(alert, currentPriceInPaise, previousPriceInPaise = null) {
-  const alertId = alert?._id ? alert._id.toString() : 'unknown';
+export function evaluateAlert(alert, currentPriceInPaise, previousPriceInPaise = null, options = {}) {
+  const alertId = alert?._id ? alert._id.toString() : (alert?.id ? alert.id.toString() : 'unknown');
+
+  // Reject cross-currency evaluation if currency tags are provided and differ
+  if (
+    options.currency &&
+    options.targetCurrency &&
+    options.currency.toUpperCase() !== options.targetCurrency.toUpperCase()
+  ) {
+    return {
+      conditionMet: false,
+      shouldNotify: false,
+      shouldRearm: false,
+      reason: `Currency mismatch: listing is in ${options.currency} but alert expects ${options.targetCurrency}`,
+      dedupeKey: `${alertId}:currency_mismatch`,
+    };
+  }
 
   // Safety net: Never trigger an alert on invalid, zero, or negative price observation (Document 1 Section 10.6)
   if (
@@ -41,13 +57,19 @@ export function evaluateAlert(alert, currentPriceInPaise, previousPriceInPaise =
       }
     }
   } else if (alert.type === 'fixed_drop') {
+    // Durable baseline semantics: If baselinePriceInPaise exists on the alert,
+    // evaluate drop from the creation baseline; otherwise fall back to previousPriceInPaise.
+    const referencePrice = (typeof alert.baselinePriceInPaise === 'number' && alert.baselinePriceInPaise > 0)
+      ? alert.baselinePriceInPaise
+      : previousPriceInPaise;
+
     if (
-      typeof previousPriceInPaise === 'number' &&
-      previousPriceInPaise > 0 &&
+      typeof referencePrice === 'number' &&
+      referencePrice > 0 &&
       typeof alert.dropAmountInPaise === 'number' &&
       alert.dropAmountInPaise > 0
     ) {
-      const drop = previousPriceInPaise - currentPriceInPaise;
+      const drop = referencePrice - currentPriceInPaise;
       conditionMet = drop >= alert.dropAmountInPaise;
       if (conditionMet) {
         reason = `Price dropped by ₹${(drop / 100).toFixed(0)}, meeting your drop threshold of ₹${(alert.dropAmountInPaise / 100).toFixed(0)}.`;

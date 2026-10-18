@@ -24,12 +24,21 @@ export const runMonitor = asyncHandler(async (req, res) => {
   // even if in-process scheduler is disabled via MONITORING_ENABLED=false
   const results = await runMonitoringCycle({ force: process.env.NODE_ENV !== 'test' });
 
+  if (results.skipped) {
+    return res.status(409).json({
+      success: false,
+      error: { code: 'OVERLAPPING_CYCLE', message: 'A price monitoring cycle is already in progress.' },
+    });
+  }
+
   return res.status(202).json({
     success: true,
     data: {
       started: true,
       offersChecked: results.offersChecked,
       triggeredAlerts: results.triggeredAlerts,
+      errors: results.errors,
+      completedAt: new Date().toISOString(),
     },
   });
 });
@@ -52,7 +61,16 @@ export const getMonitorStatus = asyncHandler(async (req, res) => {
 });
 
 export const triggerUserMonitor = asyncHandler(async (req, res) => {
-  const results = await runMonitoringCycle();
+  // Manual trigger from UI operates on demand in production/development,
+  // while in unit tests (NODE_ENV=test) it obeys MONITORING_ENABLED=false unless explicitly forced
+  const results = await runMonitoringCycle({ force: process.env.NODE_ENV !== 'test' });
+
+  if (results.skipped) {
+    return res.status(409).json({
+      success: false,
+      error: { code: 'OVERLAPPING_CYCLE', message: 'A price monitoring cycle is already in progress.' },
+    });
+  }
 
   return res.status(200).json({
     success: true,

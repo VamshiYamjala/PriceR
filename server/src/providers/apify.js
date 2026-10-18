@@ -497,7 +497,52 @@ export async function fetchOffer(offer) {
       };
     }
 
-    const normalized = normalizeApifyItem(rawItems[0], retailer);
+    // Match the specific item corresponding to the tracked listing
+    const getRawListingId = (raw) => {
+      if (!raw || typeof raw !== 'object') return null;
+      return (
+        raw.asin ||
+        raw.productId ||
+        raw.id ||
+        raw.itemId ||
+        (raw.url ? extractIdFromUrl(raw.url) : null)
+      );
+    };
+
+    let matchedRaw = null;
+
+    if (cleanId) {
+      matchedRaw = rawItems.find((raw) => {
+        const rawId = getRawListingId(raw);
+        return rawId && rawId.toLowerCase() === cleanId.toLowerCase();
+      });
+    }
+
+    if (!matchedRaw && offer.productUrl) {
+      matchedRaw = rawItems.find((raw) => {
+        const rawUrl = raw.url || raw.productUrl;
+        return rawUrl && rawUrl.toLowerCase() === offer.productUrl.toLowerCase();
+      });
+    }
+
+    // Fall back to first item only if targeted single-item URL was requested and rawItems contains 1 result
+    if (!matchedRaw && rawItems.length === 1) {
+      const singleId = getRawListingId(rawItems[0]);
+      if (!cleanId || !singleId || singleId.toLowerCase() === cleanId.toLowerCase()) {
+        matchedRaw = rawItems[0];
+      }
+    }
+
+    if (!matchedRaw) {
+      return {
+        provider: 'apify',
+        externalProductId: offer.externalProductId,
+        success: false,
+        errorMessage: `Listing mismatch: Apify returned items that do not match tracked ID "${cleanId}".`,
+      };
+    }
+
+    const normalized = normalizeApifyItem(matchedRaw, retailer);
     if (!normalized || !normalized.priceInPaise || normalized.priceInPaise <= 0) {
       return {
         provider: 'apify',

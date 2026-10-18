@@ -3,7 +3,7 @@ import Alert from '../models/Alert.js';
 import Offer from '../models/Offer.js';
 import User from '../models/User.js';
 import { evaluateAlert } from '../services/alertEvaluator.js';
-import { dispatchAlertNotifications } from '../services/alertDispatcher.js';
+import { dispatchAlertNotifications, evaluateNotificationCompletion } from '../services/alertDispatcher.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function toPublicAlert(alert) {
@@ -22,8 +22,10 @@ function toPublicAlert(alert) {
         }
       : undefined,
     type: alert.type,
+    currency: alert.currency || (alert.offerId && typeof alert.offerId === 'object' ? alert.offerId.currency : null) || 'INR',
     targetPriceInPaise: alert.targetPriceInPaise ?? null,
     dropAmountInPaise: alert.dropAmountInPaise ?? null,
+    baselinePriceInPaise: alert.baselinePriceInPaise ?? null,
     channels: alert.channels,
     status: alert.status,
     armed: alert.armed,
@@ -51,12 +53,18 @@ export const createAlert = asyncHandler(async (req, res) => {
     });
   }
 
+  const baselinePrice = typeof offer.priceInPaise === 'number' && offer.priceInPaise > 0
+    ? offer.priceInPaise
+    : undefined;
+
   const alert = await Alert.create({
     userId: req.user.id,
     offerId,
     type,
+    currency: offer.currency || 'INR',
     targetPriceInPaise: type === 'target_price' ? targetPriceInPaise : undefined,
     dropAmountInPaise: type === 'fixed_drop' ? dropAmountInPaise : undefined,
+    baselinePriceInPaise: type === 'fixed_drop' ? baselinePrice : undefined,
     channels,
     status: 'active',
     armed: true,
@@ -66,18 +74,29 @@ export const createAlert = asyncHandler(async (req, res) => {
 
   // Immediate evaluation for target_price alerts:
   // If the offer already satisfies the target condition (e.g. currentPrice <= targetPrice),
-  // dispatch notification immediately and disarm the alert so the user is instantly notified.
-  // Fixed-drop alerts establish baseline upon creation and do NOT trigger until a subsequent drop.
+  // attempt notification immediately. Only disarm if at least one channel succeeds.
+  // If all channels fail, retain armed state so scheduled monitoring retries.
   if (type === 'target_price' && typeof offer.priceInPaise === 'number' && offer.priceInPaise > 0) {
-    const evalResult = evaluateAlert(alert, offer.priceInPaise, null);
-    if (evalResult.shouldNotify) {
-      triggeredImmediately = true;
-      alert.armed = false;
-      alert.lastTriggeredAt = new Date();
-      await alert.save();
+    const evalResult = evaluateAlert(alert, offer.priceInPaise, null, {
+      currency: offer.currency,
+      targetCurrency: alert.currency,
+    });
 
+    if (evalResult.shouldNotify) {
       const user = await User.findById(req.user.id);
-      await dispatchAlertNotifications({ alert, offer, user, evalResult });
+      const dispatchResults = await dispatchAlertNotifications({ alert, offer, user, evalResult });
+      const { allComplete, pendingChannels } = evaluateNotificationCompletion(alert, dispatchResults);
+
+      if (allComplete) {
+        triggeredImmediately = true;
+        alert.armed = false;
+        alert.lastTriggeredAt = new Date();
+        await alert.save();
+      } else {
+        console.warn(
+          `[alerts] Immediate notification dispatch incomplete for alert ${alert._id} (pending: ${pendingChannels.join(', ')}); retaining armed state for retry.`
+        );
+      }
     }
   }
 

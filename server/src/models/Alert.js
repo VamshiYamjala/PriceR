@@ -42,6 +42,21 @@ const alertSchema = new mongoose.Schema(
         message: 'dropAmountInPaise must be an integer',
       },
     },
+    baselinePriceInPaise: {
+      type: Number,
+      required: false,
+      validate: {
+        validator: function (v) {
+          return v === undefined || v === null || Number.isInteger(v);
+        },
+        message: 'baselinePriceInPaise must be an integer',
+      },
+    },
+    currency: {
+      type: String,
+      required: false,
+      default: 'INR',
+    },
     channels: {
       type: [String],
       enum: ['email', 'telegram'],

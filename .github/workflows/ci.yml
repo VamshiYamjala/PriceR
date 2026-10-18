@@ -10,6 +10,16 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -27,7 +37,7 @@ jobs:
         working-directory: server
         env:
           NODE_ENV: test
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_URI: mongodb://127.0.0.1:27017/priceradar_ci_test
           JWT_SECRET: ci-test-secret-at-least-32-characters-long
           MONITOR_TRIGGER_SECRET: ci-monitor-secret-12345
           MONITORING_ENABLED: "false"

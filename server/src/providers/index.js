@@ -30,16 +30,18 @@ export async function fetchOffer(offer) {
     result = await mockshopProvider.fetchOffer(offer);
   } else if (offer.provider === 'scrapling') {
     result = await scraplingProvider.fetchOffer(offer);
-  } else if (offer.isSample) {
-    // Every sample offer goes to the fixture provider, regardless of whether
-    // its provider label is "flipkart" or "amazon". We do NOT use provider-based
-    // routing here, because a "flipkart"-labeled offer can still be sample data
-    // until Flipkart approval is verified (Document 1, Section 10.4).
+  } else if (offer.isSample || offer.provider === 'fixture') {
+    // Every sample/fixture offer goes to the fixture provider.
     result = await fixtureProvider.fetchOffer(offer);
   } else if (offer.provider === 'flipkart') {
-    // NOT WIRED IN BY DEFAULT. See providers/flipkart.js and the switch-over
-    // checklist in Document 4, Section 7.4.
-    result = await fixtureProvider.fetchOffer(offer);
+    // Live Flipkart affiliate API is not wired in by default (Document 4, Section 7.4).
+    // Live offers must never silently masquerade as successfully refreshed via fixture data.
+    result = {
+      provider: offer.provider,
+      externalProductId: offer.externalProductId,
+      success: false,
+      errorMessage: 'Live Flipkart affiliate API is not configured; live offers cannot be refreshed via fixture data.',
+    };
   } else if (offer.provider === 'amazon') {
     // Amazon NEVER has a live code path (Document 1, Section 10.2).
     result = await amazonProvider.fetchOffer(offer);

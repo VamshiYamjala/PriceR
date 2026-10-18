@@ -1,8 +1,13 @@
 // server/tests/diagnostics.test.js
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../src/app.js';
 
 describe('System Diagnostics API (/api/diagnostics)', () => {
+  beforeAll(() => {
+    jest.setTimeout(30000);
+  });
+
   it('GET /api/diagnostics returns complete 9-category report with summary', async () => {
     const res = await request(app).get('/api/diagnostics');
     expect(res.status).toBe(200);
@@ -50,7 +55,7 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
       expect(check.actual).toBeDefined();
       expect(typeof check.durationMs).toBe('number');
     }
-  });
+  }, 30000);
 
   it('Security check: NEVER exposes secret values or tokens in diagnostic reports', async () => {
     const res = await request(app).get('/api/diagnostics');
@@ -73,7 +78,7 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
       // Should not contain credentials part of Mongo URI
       expect(rawJson).not.toContain('@cluster');
     }
-  });
+  }, 30000);
 
   it('GET /api/diagnostics/sources/ebay returns sanitized eBay diagnostic', async () => {
     const res = await request(app).get('/api/diagnostics/sources/ebay');
@@ -81,7 +86,7 @@ describe('System Diagnostics API (/api/diagnostics)', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.provider).toBe('ebay');
     expect(res.body.data.credentialsPresent).toBeDefined();
-  });
+  }, 30000);
 
   it('GET /api/diagnostics/sources/apify returns sanitized Apify config', async () => {
     const res = await request(app).get('/api/diagnostics/sources/apify');

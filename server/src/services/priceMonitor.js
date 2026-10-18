@@ -7,13 +7,13 @@
 // 4. Evaluates all active alerts that depend on updated offers
 // 5. Triggers email/telegram notifications through notification services and logs NotificationEvent
 
-import { fetchOffer } from '../providers/index.js';
+import providerDispatcher from '../providers/index.js';
 import Offer from '../models/Offer.js';
 import PriceObservation from '../models/PriceObservation.js';
 import Alert from '../models/Alert.js';
 import User from '../models/User.js';
 import { evaluateAlert } from './alertEvaluator.js';
-import { dispatchAlertNotifications } from './alertDispatcher.js';
+import { dispatchAlertNotifications, evaluateNotificationCompletion } from './alertDispatcher.js';
 
 // In-memory monitoring state for reporting via GET /api/monitor/status
 let monitorState = {
@@ -47,96 +47,118 @@ export function setMonitorStateForTesting(state) {
 export async function runMonitoringCycle(options = {}) {
   if (process.env.MONITORING_ENABLED === 'false' && !options.force) {
     console.log('[monitor] Monitoring is disabled via MONITORING_ENABLED=false');
-    return { offersChecked: 0, triggeredAlerts: 0, errors: 0 };
+    return { offersChecked: 0, triggeredAlerts: 0, errors: 0, skipped: false };
+  }
+
+  if (monitorState.isRunning) {
+    console.warn('[monitor] Previous monitoring cycle still in progress; skipping overlapping cycle.');
+    return {
+      offersChecked: 0,
+      triggeredAlerts: 0,
+      errors: 0,
+      skipped: true,
+      reason: 'OVERLAPPING_CYCLE',
+    };
   }
 
   console.log('[monitor] Starting price monitoring cycle...');
   monitorState.isRunning = true;
 
-  // Find distinct offers associated with active alerts
-  const activeAlerts = await Alert.find({ status: 'active' }).populate('offerId');
-  const distinctOfferIds = [...new Set(activeAlerts.map((a) => a.offerId?._id?.toString()).filter(Boolean))];
-
   let offersChecked = 0;
   let triggeredAlerts = 0;
   let errorsCount = 0;
 
-  for (const offerId of distinctOfferIds) {
-    try {
-      const offer = await Offer.findById(offerId);
-      if (!offer) continue;
+  try {
+    // Find distinct offers associated with active alerts
+    const activeAlerts = await Alert.find({ status: 'active' }).populate('offerId');
+    const distinctOfferIds = [...new Set(activeAlerts.map((a) => a.offerId?._id?.toString()).filter(Boolean))];
 
-      // Refresh any tracked offer (fixtures, dummyjson, mockshop, scrapling, ebay)
+    for (const offerId of distinctOfferIds) {
+      try {
+        const offer = await Offer.findById(offerId);
+        if (!offer) continue;
 
-      const fetchResult = await fetchOffer(offer);
-      offersChecked++;
+        const fetchResult = await providerDispatcher.fetchOffer(offer);
+        offersChecked++;
 
-      if (fetchResult.success && typeof fetchResult.priceInPaise === 'number') {
-        const previousPrice = offer.priceInPaise;
-        offer.priceInPaise = fetchResult.priceInPaise;
-        offer.lastFetchedAt = new Date();
-        offer.lastSuccessAt = new Date();
-        offer.lastStatus = 'ok';
-        offer.lastError = null;
-        await offer.save();
+        if (fetchResult.success && typeof fetchResult.priceInPaise === 'number' && fetchResult.priceInPaise > 0) {
+          const previousPrice = offer.priceInPaise;
+          offer.priceInPaise = fetchResult.priceInPaise;
+          offer.lastFetchedAt = new Date();
+          offer.lastSuccessAt = new Date();
+          offer.lastStatus = 'ok';
+          offer.lastError = null;
+          await offer.save();
 
-        await PriceObservation.create({
-          offerId: offer._id,
-          priceInPaise: fetchResult.priceInPaise,
-          status: 'success',
-          fetchedAt: new Date(),
-        });
+          await PriceObservation.create({
+            offerId: offer._id,
+            priceInPaise: fetchResult.priceInPaise,
+            status: 'success',
+            fetchedAt: new Date(),
+          });
 
-        // Evaluate dependent alerts
-        const dependentAlerts = activeAlerts.filter(
-          (a) => a.offerId?._id?.toString() === offer._id.toString()
-        );
+          // Evaluate dependent alerts
+          const dependentAlerts = activeAlerts.filter(
+            (a) => a.offerId?._id?.toString() === offer._id.toString()
+          );
 
-        for (const alert of dependentAlerts) {
-          const evalResult = evaluateAlert(alert, fetchResult.priceInPaise, previousPrice);
-          if (evalResult.shouldNotify) {
-            triggeredAlerts++;
-            alert.armed = false;
-            alert.lastTriggeredAt = new Date();
-            await alert.save();
+          for (const alert of dependentAlerts) {
+            const evalResult = evaluateAlert(alert, fetchResult.priceInPaise, previousPrice, {
+              currency: fetchResult.currency || offer.currency,
+              targetCurrency: offer.currency,
+            });
 
-            // Dispatch multi-channel notifications and record NotificationEvent
-            await dispatchAlertNotifications({ alert, offer, evalResult });
-          } else if (evalResult.shouldRearm) {
-            alert.armed = true;
-            await alert.save();
+            if (evalResult.shouldNotify) {
+              // Dispatch multi-channel notifications and record NotificationEvent
+              const dispatchResults = await dispatchAlertNotifications({ alert, offer, evalResult });
+              const { allComplete, pendingChannels } = evaluateNotificationCompletion(alert, dispatchResults);
+
+              if (allComplete) {
+                triggeredAlerts++;
+                alert.armed = false;
+                alert.lastTriggeredAt = new Date();
+                await alert.save();
+              } else {
+                console.warn(
+                  `[monitor] Alert ${alert._id} notification delivery incomplete (pending: ${pendingChannels.join(', ')}); retaining armed state for retry.`
+                );
+              }
+            } else if (evalResult.shouldRearm) {
+              alert.armed = true;
+              await alert.save();
+            }
           }
-        }
-      } else {
-        // Record failure safely — never 0 rupees (Document 1 Section 10.6)
-        errorsCount++;
-        offer.lastFetchedAt = new Date();
-        offer.lastStatus = 'error';
-        offer.lastError = fetchResult.errorMessage || 'Fetch failed';
-        await offer.save();
+        } else {
+          // Record failure safely — never 0 rupees (Document 1 Section 10.6)
+          errorsCount++;
+          offer.lastFetchedAt = new Date();
+          offer.lastStatus = 'error';
+          offer.lastError = fetchResult.errorMessage || 'Fetch failed';
+          await offer.save();
 
-        await PriceObservation.create({
-          offerId: offer._id,
-          status: 'failure',
-          errorMessage: fetchResult.errorMessage,
-          fetchedAt: new Date(),
-        });
+          await PriceObservation.create({
+            offerId: offer._id,
+            status: 'failure',
+            errorMessage: fetchResult.errorMessage || 'Fetch failed',
+            fetchedAt: new Date(),
+          });
+        }
+      } catch (err) {
+        errorsCount++;
+        console.error(`[monitor] Error processing offer ${offerId}:`, err.message);
       }
-    } catch (err) {
-      errorsCount++;
-      console.error(`[monitor] Error processing offer ${offerId}:`, err.message);
     }
+  } finally {
+    monitorState = {
+      lastRunAt: new Date().toISOString(),
+      lastRunOffersChecked: offersChecked,
+      lastRunErrors: errorsCount,
+      isRunning: false,
+    };
   }
 
-  monitorState = {
-    lastRunAt: new Date().toISOString(),
-    lastRunOffersChecked: offersChecked,
-    lastRunErrors: errorsCount,
-    isRunning: false,
-  };
-
   console.log(`[monitor] Cycle finished. Checked ${offersChecked} offers, triggered ${triggeredAlerts} alerts, encountered ${errorsCount} errors.`);
-  return { offersChecked, triggeredAlerts, errors: errorsCount };
+  return { offersChecked, triggeredAlerts, errors: errorsCount, skipped: false };
 }
 
 export default { runMonitoringCycle, getMonitorState, setMonitorStateForTesting };

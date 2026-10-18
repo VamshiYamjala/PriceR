@@ -49,7 +49,8 @@ export async function seedFixtures(options = {}) {
 
   let connectedLocally = false;
   if (mongoose.connection.readyState === 0) {
-    console.log('[seeder] Connecting to MongoDB Atlas...');
+    const isRemote = mongoUri.includes('.mongodb.net');
+    console.log(`[seeder] Connecting to ${isRemote ? 'MongoDB Atlas' : 'local/test MongoDB instance'}...`);
     await mongoose.connect(mongoUri);
     connectedLocally = true;
     console.log('[seeder] Connected successfully.');
