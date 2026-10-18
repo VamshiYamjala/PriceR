@@ -4,6 +4,7 @@ import app from './app.js';
 import connectDB from './config/db.js';
 import { startLinkListener, stopLinkListener } from './services/notifications/telegram.js';
 import { startScheduler, stopScheduler } from './services/scheduler.js';
+import { reconcileStaleRuns } from './services/priceMonitor.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -24,6 +25,9 @@ function startBackgroundServices() {
   }
 
   if (process.env.NODE_ENV !== 'test') {
+    reconcileStaleRuns().catch((err) => {
+      console.warn('[server] Warning reconciling stale monitor runs:', err.message);
+    });
     try {
       startScheduler();
     } catch (err) {

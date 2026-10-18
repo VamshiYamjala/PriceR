@@ -26,4 +26,20 @@ export function requireAuth(req, res, next) {
   }
 }
 
+export function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.slice('Bearer '.length).trim();
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { id: payload.sub, role: payload.role || 'user' };
+  } catch {
+    // Leave req.user undefined and proceed safely
+  }
+  return next();
+}
+
 export default requireAuth;

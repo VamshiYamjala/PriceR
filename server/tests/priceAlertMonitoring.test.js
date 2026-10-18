@@ -435,7 +435,7 @@ describe('Price Alert Monitoring & Scheduler End-to-End Regression Suite (17 Con
   });
 
   // 16: Controller and API response contract reporting
-  it('Condition 16: POST /api/monitor/run reports offersChecked, triggeredAlerts, and completedAt on success', async () => {
+  it('Condition 16: POST /api/monitor/run acknowledges promptly with runId and records metrics on run status endpoint', async () => {
     if (!hasDb) return;
 
     const res = await request(app)
@@ -445,8 +445,20 @@ describe('Price Alert Monitoring & Scheduler End-to-End Regression Suite (17 Con
     expect(res.statusCode).toBe(202);
     expect(res.body.success).toBe(true);
     expect(res.body.data.started).toBe(true);
-    expect(typeof res.body.data.offersChecked).toBe('number');
-    expect(typeof res.body.data.triggeredAlerts).toBe('number');
+    expect(res.body.data.status).toBe('running');
+    expect(res.body.data.runId).toBeDefined();
+
+    // Wait for background worker to complete
+    await new Promise((r) => setTimeout(r, 600));
+
+    // Verify metrics on run-specific status endpoint
+    const statusRes = await request(app)
+      .get(`/api/monitor/runs/${res.body.data.runId}`)
+      .set('X-Monitor-Secret', MONITOR_SECRET);
+
+    expect(statusRes.statusCode).toBe(200);
+    expect(typeof statusRes.body.data.offersAttempted).toBe('number');
+    expect(typeof statusRes.body.data.triggeredAlerts).toBe('number');
   });
 
   // 17: User on-demand refresh triggers successfully from UI

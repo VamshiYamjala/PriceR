@@ -11,7 +11,7 @@ jobs:
     name: Trigger Price Refresh Cycle
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Remote Monitor Endpoint
+      - name: Trigger Remote Monitor Endpoint and Poll Run Outcome
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
           MONITOR_SECRET: ${{ secrets.MONITOR_TRIGGER_SECRET }}
@@ -30,40 +30,124 @@ jobs:
 
           # Strip any trailing slash from BACKEND_URL
           BASE_URL="${BACKEND_URL%/}"
-          TARGET_URL="${BASE_URL}/api/monitor/run"
+          TRIGGER_URL="${BASE_URL}/api/monitor/run"
 
-          echo "Triggering price monitor endpoint: ${BASE_URL}/api/monitor/run"
+          echo "Triggering price monitor endpoint: ${TRIGGER_URL}"
           echo "Using bounded retries to accommodate Render free-tier cold starts..."
 
-          # Curl with bounded retries for sleeping Render free instances:
-          # --retry 3: retry transient errors up to 3 times
-          # --retry-delay 5: wait 5s between retries
-          # --retry-connrefused: retry if connection is refused during cold start
-          # --max-time 60: bound request to 60 seconds
-          HTTP_CODE=$(curl -s -S -o response.json -w "%{http_code}" \
+          # Curl with bounded retries for sleeping Render free instances
+          HTTP_CODE=$(curl -s -S -o trigger_response.json -w "%{http_code}" \
             --retry 3 \
             --retry-delay 5 \
             --retry-connrefused \
             --max-time 60 \
-            -X POST "$TARGET_URL" \
+            -X POST "$TRIGGER_URL" \
             -H "X-Monitor-Secret: $MONITOR_SECRET" \
             -H "Content-Type: application/json" || echo "000")
 
-          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Trigger HTTP Status Code: $HTTP_CODE"
 
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "✅ Price monitoring cycle triggered successfully."
-            if [ -f response.json ]; then
-              echo "Sanitized Response Payload:"
-              cat response.json
-              echo ""
-            fi
-          else
-            echo "::error::Price monitor trigger failed with HTTP status $HTTP_CODE"
-            if [ -f response.json ]; then
+          if [ "$HTTP_CODE" -ne 202 ]; then
+            echo "::error::Price monitor trigger did not return HTTP 202 Accepted. Status: $HTTP_CODE"
+            if [ -f trigger_response.json ]; then
               echo "Server Error Response:"
-              cat response.json
+              cat trigger_response.json
               echo ""
             fi
             exit 1
+          fi
+
+          RUN_ID=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('trigger_response.json', 'utf8')); console.log(d.data?.runId || ''); } catch { console.log(''); }")
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::Did not receive valid runId in trigger response."
+            cat trigger_response.json
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ Price monitoring cycle accepted by backend."
+          echo "Monitoring Run ID: ${RUN_ID}"
+          echo "Polling run-specific status at: ${BASE_URL}/api/monitor/runs/${RUN_ID}"
+
+          # Bounded poll loop: check status every 10s for up to 180s
+          MAX_POLL_SECS=180
+          POLL_INTERVAL=10
+          ELAPSED=0
+          FINAL_STATUS="in_progress"
+
+          while [ $ELAPSED -lt $MAX_POLL_SECS ]; do
+            sleep $POLL_INTERVAL
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+
+            POLL_CODE=$(curl -s -S -o status_response.json -w "%{http_code}" \
+              --max-time 20 \
+              -H "X-Monitor-Secret: $MONITOR_SECRET" \
+              "${BASE_URL}/api/monitor/runs/${RUN_ID}" || echo "000")
+
+            if [ "$POLL_CODE" -ne 200 ]; then
+              echo "Status check returned HTTP $POLL_CODE (elapsed: ${ELAPSED}s). Retrying..."
+              continue
+            fi
+
+            CURRENT_STATUS=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')); console.log(d.data?.status || 'unknown'); } catch { console.log('unknown'); }")
+
+            if [ "$CURRENT_STATUS" = "completed" ] || [ "$CURRENT_STATUS" = "failed" ] || [ "$CURRENT_STATUS" = "interrupted" ]; then
+              FINAL_STATUS="$CURRENT_STATUS"
+              break
+            else
+              echo "Monitoring cycle is in progress... (elapsed: ${ELAPSED}s)"
+            fi
+          done
+
+          echo ""
+          echo "=========================================================="
+          echo "Final Monitoring Outcome for Run: ${RUN_ID}"
+          echo "Status: ${FINAL_STATUS}"
+
+          if [ "$FINAL_STATUS" = "completed" ]; then
+            node -e "
+              const fs = require('fs');
+              const d = JSON.parse(fs.readFileSync('status_response.json', 'utf8')).data;
+              console.log('Duration: ' + (d.durationMs ? (d.durationMs / 1000).toFixed(1) + 's' : 'N/A'));
+              console.log('Offers Attempted: ' + d.offersAttempted);
+              console.log('Offers Refreshed Successfully: ' + d.offersSuccessful);
+              console.log('Offers Failed: ' + d.offersFailed);
+              console.log('Triggered Alerts: ' + d.triggeredAlerts);
+              if (d.errors && d.errors.length > 0) {
+                console.log('Sanitized Errors:');
+                d.errors.forEach((err, idx) => {
+                  console.log('  ' + (idx + 1) + '. Provider: ' + (err.provider || 'unknown') + ' | Error: ' + err.message);
+                });
+              }
+            "
+            echo "=========================================================="
+            ERRORS_COUNT=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.offersFailed || 0); } catch { console.log(0); }")
+            if [ "$ERRORS_COUNT" -gt 0 ]; then
+              echo "::warning::$ERRORS_COUNT offer refresh(es) encountered errors during this cycle. Verify provider credentials in Render if live scrapers are unconfigured."
+            else
+              echo "✅ All tracked offers refreshed successfully."
+            fi
+            exit 0
+
+          elif [ "$FINAL_STATUS" = "failed" ]; then
+            FAILURE_REASON=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.failureReason || 'Unknown failure'); } catch { console.log('Unknown failure'); }")
+            echo "Failure Reason: ${FAILURE_REASON}"
+            echo "=========================================================="
+            echo "::error::Monitoring cycle failed on server: ${FAILURE_REASON}"
+            exit 1
+
+          elif [ "$FINAL_STATUS" = "interrupted" ]; then
+            echo "=========================================================="
+            echo "::error::Monitoring cycle was interrupted by a server restart or timeout."
+            exit 1
+
+          else
+            echo "=========================================================="
+            echo "::warning::Monitoring cycle is still running in the background after ${MAX_POLL_SECS}s."
+            echo "Result is inconclusive: the background scrape was accepted (Run ID: ${RUN_ID}), but has not completed within the polling window."
+            echo "Do NOT assume prices refreshed successfully."
+            echo "Inspect the run outcome later using:"
+            echo "curl -H 'X-Monitor-Secret: [SECRET]' '${BASE_URL}/api/monitor/runs/${RUN_ID}'"
+            exit 0
           fi
