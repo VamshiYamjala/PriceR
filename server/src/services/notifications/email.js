@@ -18,9 +18,9 @@ export function getEmailConfigStatus() {
   if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
     reloadEnv();
   }
-  const apiKey = (process.env.BREVO_API_KEY || '').trim();
-  const fromAddress = (process.env.EMAIL_FROM || '').trim();
-  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim();
+  const apiKey = (process.env.BREVO_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const fromAddress = (process.env.EMAIL_FROM || '').trim().replace(/^["']|["']$/g, '');
+  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim().replace(/^["']|["']$/g, '');
 
   return {
     configured: Boolean(apiKey && fromAddress),
@@ -43,15 +43,16 @@ export async function sendEmail({ to, subject, text, html }) {
   if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
     reloadEnv();
   }
-  const apiKey = (process.env.BREVO_API_KEY || '').trim();
-  const fromAddress = (process.env.EMAIL_FROM || '').trim();
-  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim();
+  const apiKey = (process.env.BREVO_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const fromAddress = (process.env.EMAIL_FROM || '').trim().replace(/^["']|["']$/g, '');
+  const fromName = (process.env.EMAIL_FROM_NAME || 'PriceRadar').trim().replace(/^["']|["']$/g, '');
   const recipient = (to || '').trim();
 
   if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
     return {
       success: false,
       recipient: recipient || null,
+      statusCode: null,
       errorMessage: `Invalid recipient email address: "${to}".`,
     };
   }
@@ -60,7 +61,8 @@ export async function sendEmail({ to, subject, text, html }) {
     return {
       success: false,
       recipient,
-      errorMessage: 'BREVO_API_KEY or EMAIL_FROM is not configured in server/.env.',
+      statusCode: null,
+      errorMessage: 'BREVO_API_KEY or EMAIL_FROM is not configured in the server environment.',
     };
   }
 
@@ -178,8 +180,8 @@ export async function verifyBrevoApiConnection() {
   if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
     reloadEnv();
   }
-  const apiKey = (process.env.BREVO_API_KEY || '').trim();
-  const fromAddress = (process.env.EMAIL_FROM || '').trim();
+  const apiKey = (process.env.BREVO_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const fromAddress = (process.env.EMAIL_FROM || '').trim().replace(/^["']|["']$/g, '');
 
   if (!apiKey || !fromAddress) {
     return {
