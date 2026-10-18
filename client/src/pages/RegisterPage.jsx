@@ -46,14 +46,15 @@ export default function RegisterPage() {
       const res = await api.initiateRegistration({ name, email, password });
       setStep('otp');
       setResendCooldown(res?.resendCooldownSeconds || 60);
-      setInfoMessage(`A 6-digit verification code was sent to ${email}. Please check your inbox.`);
+      setInfoMessage(`A 6-digit verification code was sent to ${email}. Please check your Inbox, Spam, or Promotions tab.`);
     } catch (err) {
       const msg =
         err.response?.data?.error?.message ||
         (err.code === 'ERR_NETWORK'
-          ? 'Cannot connect to backend server. Please ensure the backend is running on port 5000.'
+          ? 'Cannot connect to server. Please verify your internet connection or try again shortly.'
           : 'Registration failed. Please check your information and try again.');
       setError(msg);
+      // Remain on form step so user can review details and retry
     } finally {
       setLoading(false);
     }
@@ -102,9 +103,9 @@ export default function RegisterPage() {
     try {
       const res = await api.resendRegistrationOtp({ email });
       setResendCooldown(res?.resendCooldownSeconds || 60);
-      setInfoMessage('A fresh verification code has been dispatched to your email.');
+      setInfoMessage('A fresh verification code has been dispatched. Please check your Inbox, Spam, or Promotions tab.');
     } catch (err) {
-      const msg = err.response?.data?.error?.message || 'Failed to resend code. Please wait a moment.';
+      const msg = err.response?.data?.error?.message || 'Failed to resend code. Please wait a moment and try again.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -268,7 +269,10 @@ export default function RegisterPage() {
                     }}
                   />
                   <div className="form-text text-center text-muted small mt-2">
-                    Code expires in 10 minutes. Check spam folder if not in inbox.
+                    Code expires in 10 minutes. If not in your inbox, please check your Spam or Promotions tab.
+                  </div>
+                  <div className="text-center text-secondary small mt-1" style={{ fontSize: '0.8rem' }}>
+                    Note: Email delivery typically takes a few seconds, but may take 1–2 minutes depending on your mail provider.
                   </div>
                 </div>
 

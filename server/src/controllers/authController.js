@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import OtpChallenge from '../models/OtpChallenge.js';
-import { sendOtpEmail } from '../services/notifications/email.js';
+import emailService from '../services/notifications/email.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function toPublicUser(userDoc) {
@@ -24,6 +24,14 @@ function signToken(userId) {
 
 function hashOtp(code) {
   return crypto.createHash('sha256').update(code.trim()).digest('hex');
+}
+
+function maskEmail(email) {
+  if (!email || typeof email !== 'string') return '***';
+  const [user, domain] = email.split('@');
+  if (!domain) return '***';
+  const visible = user.slice(0, 2);
+  return `${visible}***@${domain}`;
 }
 
 /**
@@ -50,7 +58,7 @@ export const initiateRegistration = asyncHandler(async (req, res) => {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   const resendAvailableAt = new Date(Date.now() + 60 * 1000); // 60s cooldown
 
-  await OtpChallenge.findOneAndUpdate(
+  const challenge = await OtpChallenge.findOneAndUpdate(
     { email: normalizedEmail, purpose: 'register' },
     {
       name: name.trim(),
@@ -66,18 +74,35 @@ export const initiateRegistration = asyncHandler(async (req, res) => {
   );
 
   // Send verification email via Brevo
-  const emailRes = await sendOtpEmail({
+  const emailRes = await emailService.sendOtpEmail({
     to: normalizedEmail,
     otpCode,
     name: name.trim(),
     purpose: 'Account Registration',
   });
 
+  // Check if provider accepted the submission
   if (!emailRes.success) {
-    console.warn(`[auth-otp] Brevo send notice for ${normalizedEmail}: ${emailRes.errorMessage}`);
+    // Delete unusable challenge so user is not trapped in an orphaned session
+    await OtpChallenge.deleteOne({ _id: challenge._id });
+
+    console.warn(
+      `[auth-otp] Verification email dispatch failed for ${maskEmail(normalizedEmail)}: ${emailRes.errorMessage || 'Provider rejected request'}`
+    );
+
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'EMAIL_DELIVERY_FAILED',
+        message: 'Unable to send verification email at this time. Please check your email address or try again in a few minutes.',
+      },
+    });
   }
-  // Console log for local verification / development
-  console.log(`[auth-otp] Generated registration OTP for ${normalizedEmail}: ${otpCode}`);
+
+  // Safe sanitized log — never exposes plaintext OTP or secret values
+  console.log(
+    `[auth-otp] Registration OTP accepted by provider for ${maskEmail(normalizedEmail)} (messageId: ${emailRes.providerMessageId || 'accepted'})`
+  );
 
   return res.status(200).json({
     success: true,
@@ -208,22 +233,43 @@ export const resendRegistrationOtp = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate new OTP
+  // Generate candidate new OTP
   const otpCode = crypto.randomInt(100000, 999999).toString();
-  challenge.otpHash = hashOtp(otpCode);
-  challenge.expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-  challenge.resendAvailableAt = new Date(Date.now() + 60 * 1000);
-  challenge.attempts = 0;
-  await challenge.save();
 
-  await sendOtpEmail({
+  // Attempt sending fresh verification email before overwriting challenge
+  // Preserves existing valid challenge if provider rejects the resend
+  const emailRes = await emailService.sendOtpEmail({
     to: normalizedEmail,
     otpCode,
     name: challenge.name,
     purpose: 'Account Registration',
   });
 
-  console.log(`[auth-otp] Resent registration OTP for ${normalizedEmail}: ${otpCode}`);
+  if (!emailRes.success) {
+    console.warn(
+      `[auth-otp] Resend verification email failed for ${maskEmail(normalizedEmail)}: ${emailRes.errorMessage || 'Provider rejected request'}`
+    );
+
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'EMAIL_DELIVERY_FAILED',
+        message: 'Unable to send fresh verification code at this time. Please try again in a moment.',
+      },
+    });
+  }
+
+  // Provider accepted: now update challenge state
+  challenge.otpHash = hashOtp(otpCode);
+  challenge.expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  challenge.resendAvailableAt = new Date(Date.now() + 60 * 1000);
+  challenge.attempts = 0;
+  await challenge.save();
+
+  // Safe sanitized log — never exposes plaintext OTP or secret values
+  console.log(
+    `[auth-otp] Resend OTP accepted by provider for ${maskEmail(normalizedEmail)} (messageId: ${emailRes.providerMessageId || 'accepted'})`
+  );
 
   return res.status(200).json({
     success: true,

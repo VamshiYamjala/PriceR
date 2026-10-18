@@ -4,7 +4,7 @@
 // Sends a real test email ONLY when explicitly invoked with --send-test.
 
 import '../config/env.js';
-import { sendEmail, getEmailConfigStatus } from '../services/notifications/email.js';
+import { sendEmail, getEmailConfigStatus, verifyBrevoApiConnection } from '../services/notifications/email.js';
 
 async function main() {
   const isSendTest = process.argv.includes('--send-test');
@@ -46,6 +46,21 @@ async function main() {
     console.log('   1. Ensure this email address has been added and verified in Brevo Dashboard -> Senders.');
     console.log('   2. Since Gmail does not permit custom DKIM signing on third-party relays, Brevo will send');
     console.log('      via its authenticated shared relay. Check your Spam / Promotions tab if the email is not in Inbox.');
+  }
+
+  // Test live connection to Brevo REST API account endpoint (no email sent)
+  console.log('\n📡 Testing Brevo REST API connection...');
+  const connResult = await verifyBrevoApiConnection();
+  if (connResult.success) {
+    console.log('✅ Brevo REST API Authentication: SUCCESS');
+    console.log(`   Account Email: ${connResult.accountEmail || 'Verified'}`);
+    console.log(`   Plan: ${connResult.planType}`);
+  } else {
+    console.error('❌ Brevo REST API Authentication: FAILED');
+    console.error(`   ${connResult.errorMessage}`);
+    if (connResult.statusCode === 401) {
+      console.error('👉 Action: Verify BREVO_API_KEY. It must be generated in Brevo Console -> SMTP & API -> API Keys (starts with xkeysib-).');
+    }
   }
 
   if (!isSendTest) {

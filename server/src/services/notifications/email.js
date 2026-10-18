@@ -118,6 +118,7 @@ export async function sendEmail({ to, subject, text, html }) {
     return {
       success: false,
       recipient,
+      statusCode: status,
       errorMessage: status
         ? `Brevo API error ${status}: ${detail}`
         : `Brevo API request failed: ${detail}`,
@@ -169,4 +170,60 @@ export async function sendOtpEmail({ to, otpCode, name, purpose = 'Account Regis
   return sendEmail({ to, subject, text, html });
 }
 
-export default { sendEmail, sendOtpEmail, getEmailConfigStatus };
+/**
+ * Safely validates Brevo REST API credentials without sending an email.
+ * Calls GET https://api.brevo.com/v3/account with the api-key header.
+ */
+export async function verifyBrevoApiConnection() {
+  if (process.env.NODE_ENV !== 'test' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM)) {
+    reloadEnv();
+  }
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  const fromAddress = (process.env.EMAIL_FROM || '').trim();
+
+  if (!apiKey || !fromAddress) {
+    return {
+      success: false,
+      configured: false,
+      errorMessage: 'BREVO_API_KEY or EMAIL_FROM is not configured.',
+    };
+  }
+
+  if (apiKey.startsWith('xsmtpsib-')) {
+    return {
+      success: false,
+      configured: true,
+      keyFormat: 'smtp',
+      errorMessage: "BREVO_API_KEY format is xsmtpsib- (SMTP password), which is rejected by Brevo's REST API. Generate an API Key starting with xkeysib- in Brevo Console -> SMTP & API -> API Keys.",
+    };
+  }
+
+  try {
+    const res = await axios.get('https://api.brevo.com/v3/account', {
+      headers: {
+        'api-key': apiKey,
+        Accept: 'application/json',
+      },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+
+    return {
+      success: true,
+      configured: true,
+      keyFormat: 'rest',
+      accountEmail: res.data?.email || null,
+      planType: res.data?.plan?.[0]?.type || 'free',
+    };
+  } catch (err) {
+    const status = err.response ? err.response.status : null;
+    const detail = err.response?.data?.message || err.message;
+    return {
+      success: false,
+      configured: true,
+      statusCode: status,
+      errorMessage: status ? `Brevo API error ${status}: ${detail}` : `Brevo connection failed: ${detail}`,
+    };
+  }
+}
+
+export default { sendEmail, sendOtpEmail, getEmailConfigStatus, verifyBrevoApiConnection };

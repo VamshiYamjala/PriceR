@@ -1,8 +1,10 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
 import connectDB from '../src/config/db.js';
 import User from '../src/models/User.js';
+import emailService from '../src/services/notifications/email.js';
 
 describe('Authentication & Authorization API (Document 1 Section 6.1)', () => {
   const testEmail = `testuser_${Date.now()}@example.com`;
@@ -155,8 +157,17 @@ describe('Authentication & Authorization API (Document 1 Section 6.1)', () => {
   describe('Registration OTP Flow (/register/initiate, /verify, /resend)', () => {
     const otpEmail = `otp_user_${Date.now()}@example.com`;
     let otpUserId = '';
+    let sendOtpSpy;
+
+    beforeAll(() => {
+      sendOtpSpy = jest.spyOn(emailService, 'sendOtpEmail').mockResolvedValue({
+        success: true,
+        providerMessageId: 'mock-test-msg-123',
+      });
+    });
 
     afterAll(async () => {
+      if (sendOtpSpy) sendOtpSpy.mockRestore();
       if (otpUserId) {
         await User.findByIdAndDelete(otpUserId);
       }
