@@ -1,7 +1,7 @@
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 
 describe('Health Check API', () => {
   const hasMongoUri = Boolean(process.env.MONGODB_URI);
@@ -29,7 +29,7 @@ describe('Health Check API', () => {
   it('GET /api/health should return HTTP 503 when database is disconnected', async () => {
     const wasConnected = mongoose.connection.readyState === 1;
     if (wasConnected) {
-      await mongoose.connection.close();
+      await disconnectDB();
     }
 
     try {
@@ -53,8 +53,6 @@ describe('Health Check API', () => {
   });
 
   afterAll(async () => {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   });
 });

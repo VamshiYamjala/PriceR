@@ -2,7 +2,14 @@ name: PriceRadar Scheduled Price Monitor
 
 on:
   schedule:
-    # Runs every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
+    # Runs every 4 hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+    # Corresponding India Standard Time (IST = UTC + 5:30):
+    # 00:00 UTC -> 05:30 IST
+    # 04:00 UTC -> 09:30 IST
+    # 08:00 UTC -> 13:30 IST
+    # 12:00 UTC -> 17:30 IST
+    # 16:00 UTC -> 21:30 IST
+    # 20:00 UTC -> 01:30 IST
     - cron: '0 */4 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions dashboard
 
@@ -31,6 +38,14 @@ jobs:
           # Strip any trailing slash from BACKEND_URL
           BASE_URL="${BACKEND_URL%/}"
           TRIGGER_URL="${BASE_URL}/api/monitor/run"
+
+          echo "Pinging backend health endpoint to wake sleeping instances: ${BASE_URL}/api/health"
+          curl -s -S -o /dev/null \
+            --retry 5 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            --max-time 45 \
+            "${BASE_URL}/api/health" || echo "Wakeup ping completed or timed out; proceeding to trigger."
 
           echo "Triggering price monitor endpoint: ${TRIGGER_URL}"
           echo "Using bounded retries to accommodate Render free-tier cold starts..."
@@ -122,13 +137,20 @@ jobs:
               }
             "
             echo "=========================================================="
+            ATTEMPTED_COUNT=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.offersAttempted || 0); } catch { console.log(0); }")
+            SUCCESS_COUNT=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.offersSuccessful || 0); } catch { console.log(0); }")
             ERRORS_COUNT=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.offersFailed || 0); } catch { console.log(0); }")
-            if [ "$ERRORS_COUNT" -gt 0 ]; then
-              echo "::warning::$ERRORS_COUNT offer refresh(es) encountered errors during this cycle. Verify provider credentials in Render if live scrapers are unconfigured."
+
+            if [ "$ATTEMPTED_COUNT" -gt 0 ] && [ "$SUCCESS_COUNT" -eq 0 ]; then
+              echo "::error::All $ATTEMPTED_COUNT tracked offer refresh(es) failed during this monitoring cycle. Check provider credentials."
+              exit 1
+            elif [ "$ERRORS_COUNT" -gt 0 ]; then
+              echo "::warning::$ERRORS_COUNT of $ATTEMPTED_COUNT offer refresh(es) encountered errors during this cycle."
+              exit 0
             else
               echo "✅ All tracked offers refreshed successfully."
+              exit 0
             fi
-            exit 0
 
           elif [ "$FINAL_STATUS" = "failed" ]; then
             FAILURE_REASON=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.failureReason || 'Unknown failure'); } catch { console.log('Unknown failure'); }")

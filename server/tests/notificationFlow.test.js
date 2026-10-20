@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
-import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import request from 'supertest';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 import User from '../src/models/User.js';
 import Product from '../src/models/Product.js';
 import Offer from '../src/models/Offer.js';
@@ -112,9 +112,7 @@ describe('PriceRadar Notification Flow & Alert Engine Verification (10 Core Cond
         await Product.findByIdAndDelete(testProduct._id);
       }
     } finally {
-      if (mongoose.connection.readyState !== 0) {
-        await mongoose.connection.close();
-      }
+      await disconnectDB();
     }
   }, 30000);
 

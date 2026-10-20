@@ -198,6 +198,9 @@ export function startLinkListener() {
     }
     if (pollingActive) {
       pollingTimer = setTimeout(pollLoop, 3000);
+      if (pollingTimer && typeof pollingTimer.unref === 'function') {
+        pollingTimer.unref();
+      }
     }
   };
 

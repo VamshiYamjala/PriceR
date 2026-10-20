@@ -2,11 +2,12 @@ import request from 'supertest';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 import User from '../src/models/User.js';
 import Offer from '../src/models/Offer.js';
 import WatchlistItem from '../src/models/WatchlistItem.js';
 import Alert from '../src/models/Alert.js';
+import { seedFixtures } from '../src/jobs/seedFixtures.js';
 
 describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 & 6.4)', () => {
   const JWT_SECRET = process.env.JWT_SECRET || 'testsecret1234567890123456789012';
@@ -22,10 +23,14 @@ describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 
       await connectDB();
     }
 
-    // Find any existing seeded offer
-    const offer = await Offer.findOne();
+    // Find any existing seeded offer, or seed if empty
+    let offer = await Offer.findOne();
     if (!offer) {
-      return;
+      await seedFixtures({ mongoUri: process.env.MONGODB_URI });
+      offer = await Offer.findOne();
+    }
+    if (!offer) {
+      throw new Error('No offer available for watchlist test even after seeding');
     }
     testOfferId = offer._id.toString();
 
@@ -59,9 +64,7 @@ describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 
       await Alert.deleteMany({ userId: userBId });
       await User.findByIdAndDelete(userBId);
     }
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   });
 
   describe('Watchlist API & Isolation', () => {

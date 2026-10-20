@@ -564,11 +564,20 @@ export async function fetchOffer(offer) {
       isSample: false,
     };
   } catch (err) {
+    const status = err.response?.status;
+    let detail = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+    if (status === 403) {
+      detail = `Apify HTTP 403 Forbidden: Account compute units depleted, trial expired, or API token lacks actor run permissions (${detail})`;
+    } else if (status === 401) {
+      detail = `Apify HTTP 401 Unauthorized: Invalid or missing API token (${detail})`;
+    } else if (status === 429) {
+      detail = `Apify HTTP 429 Rate Limited: Rate limit exceeded on Apify platform (${detail})`;
+    }
     return {
       provider: 'apify',
       externalProductId: offer.externalProductId,
       success: false,
-      errorMessage: err.message,
+      errorMessage: detail,
     };
   }
 }

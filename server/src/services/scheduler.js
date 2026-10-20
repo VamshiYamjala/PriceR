@@ -71,8 +71,8 @@ export function startScheduler(options = {}) {
     await triggerScheduledCycle();
   }, intervalMs);
 
-  // Prevent timer from holding process open during test or shutdown if unref supported
-  if (intervalTimer && typeof intervalTimer.unref === 'function' && options.unref) {
+  // Prevent timer from holding process open during test or shutdown
+  if (intervalTimer && typeof intervalTimer.unref === 'function' && options.unref !== false) {
     intervalTimer.unref();
   }
 }

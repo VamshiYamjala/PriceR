@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 import User from '../src/models/User.js';
 import { activeLinkCodes } from '../src/routes/telegram.js';
 import {
@@ -55,9 +55,7 @@ describe('Telegram Integration & Account Linking (Document 1 Section 6.5 & Guide
     if (!hasDb) return;
     if (userAId) await User.findByIdAndDelete(userAId);
     if (userBId) await User.findByIdAndDelete(userBId);
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   }, 25000);
 
   beforeEach(() => {

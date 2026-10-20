@@ -10,6 +10,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       mongodb:
         image: mongo:7.0
@@ -32,6 +33,13 @@ jobs:
       - name: Install server dependencies
         working-directory: server
         run: npm ci
+
+      - name: Seed test database fixtures
+        working-directory: server
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://127.0.0.1:27017/priceradar_ci_test
+        run: npm run seed:fixtures
 
       - name: Run backend tests
         working-directory: server

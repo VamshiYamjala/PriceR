@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 import User from '../src/models/User.js';
 import emailService from '../src/services/notifications/email.js';
 
@@ -28,9 +28,7 @@ describe('Authentication & Authorization API (Document 1 Section 6.1)', () => {
     if (createdUserId) {
       await User.findByIdAndDelete(createdUserId);
     }
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   });
 
   describe('POST /api/auth/register', () => {

@@ -77,4 +77,13 @@ export async function connectDB(customUri) {
   await mongoose.connect(uri);
 }
 
+/**
+ * Cleanly disconnects all Mongoose connections and internal topology monitors.
+ */
+export async function disconnectDB() {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+}
+
 export default connectDB;

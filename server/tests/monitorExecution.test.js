@@ -262,7 +262,7 @@ describe('Asynchronous Monitoring Execution & Run-Specific Status Lifecycle', ()
     });
 
     try {
-      await priceMonitorService.runMonitoringCycle({ runId: runDoc._id.toString() });
+      await priceMonitorService.runMonitoringCycle({ runId: runDoc._id.toString(), force: true });
     } catch {
       // Expected to throw
     }
@@ -356,5 +356,93 @@ describe('Asynchronous Monitoring Execution & Run-Specific Status Lifecycle', ()
     const afterTouch = await MonitorLock.findById('monitoring_cycle_lock');
     expect(afterTouch.heartbeatAt.getTime()).toBeGreaterThan(oldHeartbeat);
     expect(afterTouch.isLocked).toBe(true);
+  });
+
+  // 10. Disabled Monitoring Cleanup
+  it('When MONITORING_ENABLED=false, startMonitoringRun safely completes, releases distributed lock and does not leave running status', async () => {
+    if (!hasDb) return;
+
+    const originalEnabled = process.env.MONITORING_ENABLED;
+    process.env.MONITORING_ENABLED = 'false';
+
+    try {
+      const res = await priceMonitorService.startMonitoringRun({
+        instanceId: 'test-disabled-cleanup-instance',
+        triggeredBy: 'test',
+        force: false,
+      });
+
+      expect(res.skipped).toBe(false);
+      expect(res.runId).toBeDefined();
+
+      // Wait briefly for background execution to complete
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 1. Mutex must be freed
+      const state = priceMonitorService.getMonitorState();
+      expect(state.isRunning).toBe(false);
+
+      // 2. Distributed lock must be released
+      const lockDoc = await MonitorLock.findById('monitoring_cycle_lock');
+      expect(lockDoc).not.toBeNull();
+      expect(lockDoc.isLocked).toBe(false);
+
+      // 3. MonitorRun must not remain in running state
+      const runDoc = await MonitorRun.findById(res.runId);
+      expect(runDoc).not.toBeNull();
+      expect(runDoc.status).toBe('completed');
+      expect(runDoc.failureReason).toContain('MONITORING_ENABLED is set to false');
+    } finally {
+      process.env.MONITORING_ENABLED = originalEnabled;
+    }
+  });
+
+  // 11. Forced Trigger Execution
+  it('When MONITORING_ENABLED=false, force: true forces full cycle execution', async () => {
+    if (!hasDb) return;
+
+    const originalEnabled = process.env.MONITORING_ENABLED;
+    process.env.MONITORING_ENABLED = 'false';
+
+    try {
+      const result = await priceMonitorService.runMonitoringCycle({ force: true });
+      expect(result.skipped).toBe(false);
+      expect(result.disabled).toBeUndefined();
+    } finally {
+      process.env.MONITORING_ENABLED = originalEnabled;
+    }
+  });
+
+  // 12. Overlapping Request Rejection Does Not Release Another Cycle's Lock
+  it('A request rejected with OVERLAPPING_CYCLE cannot release or overwrite the active cycle lock', async () => {
+    if (!hasDb) return;
+
+    // Start primary run
+    const primary = await priceMonitorService.startMonitoringRun({
+      instanceId: 'primary-worker',
+      triggeredBy: 'github_actions',
+      force: true,
+    });
+    expect(primary.skipped).toBe(false);
+
+    // Attempt overlapping run
+    const overlapping = await priceMonitorService.startMonitoringRun({
+      instanceId: 'intruder-worker',
+      triggeredBy: 'manual_api',
+    });
+    expect(overlapping.skipped).toBe(true);
+    expect(overlapping.reason).toBe('OVERLAPPING_CYCLE');
+
+    // Verify primary lock is STILL held by primary runId
+    const lockDuringRun = await MonitorLock.findById('monitoring_cycle_lock');
+    expect(lockDuringRun.isLocked).toBe(true);
+    expect(lockDuringRun.currentRunId.toString()).toBe(primary.runId);
+
+    // Wait for primary to complete
+    await new Promise((r) => setTimeout(r, 600));
+
+    // After primary completes, lock is safely released
+    const lockAfter = await MonitorLock.findById('monitoring_cycle_lock');
+    expect(lockAfter.isLocked).toBe(false);
   });
 });

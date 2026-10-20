@@ -4,7 +4,7 @@ import request from 'supertest';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
 import User from '../src/models/User.js';
 import OtpChallenge from '../src/models/OtpChallenge.js';
 import emailService from '../src/services/notifications/email.js';
@@ -34,9 +34,7 @@ describe('Registration Email OTP End-to-End Regression Suite', () => {
         await User.deleteMany({ email });
       } catch (_) {}
     }
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   });
 
   afterEach(() => {

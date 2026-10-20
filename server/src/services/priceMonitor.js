@@ -345,11 +345,6 @@ function executeCycleInBackground(runId, options = {}) {
  * @returns {Promise<{offersChecked: number, triggeredAlerts: number, errors: number, skipped: boolean, runId?: string}>}
  */
 export async function runMonitoringCycle(options = {}) {
-  if (process.env.MONITORING_ENABLED === 'false' && !options.force) {
-    console.log('[monitor] Monitoring is disabled via MONITORING_ENABLED=false');
-    return { offersChecked: 0, triggeredAlerts: 0, errors: 0, skipped: false };
-  }
-
   // If not pre-locked by startMonitoringRun, acquire in-memory lock here
   if (!options.isPreLocked) {
     if (monitorState.isRunning) {
@@ -373,10 +368,24 @@ export async function runMonitoringCycle(options = {}) {
   let errorsCount = 0;
   const sanitizedErrors = [];
   let fatalError = null;
-
-  console.log(`[monitor] Starting price monitoring cycle${runId ? ` (runId: ${runId})` : ''}...`);
+  let isDisabled = false;
 
   try {
+    if (process.env.MONITORING_ENABLED === 'false' && !options.force) {
+      console.log('[monitor] Monitoring is disabled via MONITORING_ENABLED=false');
+      isDisabled = true;
+      return {
+        runId,
+        offersChecked: 0,
+        triggeredAlerts: 0,
+        errors: 0,
+        skipped: false,
+        disabled: true,
+      };
+    }
+
+    console.log(`[monitor] Starting price monitoring cycle${runId ? ` (runId: ${runId})` : ''}...`);
+
     // If runId was not provided (e.g. standalone/test execution), create MonitorRun on the fly if DB connected
     if (!runId && mongoose.connection.readyState === 1 && typeof MonitorRun?.create === 'function') {
       try {
@@ -505,8 +514,18 @@ export async function runMonitoringCycle(options = {}) {
     // Update persistent MonitorRun document
     if (runId && mongoose.connection.readyState === 1) {
       try {
+        let finalStatus = 'completed';
+        let failureReason = null;
+        if (fatalError) {
+          finalStatus = 'failed';
+          failureReason = fatalError;
+        } else if (isDisabled) {
+          finalStatus = 'completed';
+          failureReason = 'Monitoring skipped: MONITORING_ENABLED is set to false.';
+        }
+
         await MonitorRun.findByIdAndUpdate(runId, {
-          status: fatalError ? 'failed' : 'completed',
+          status: finalStatus,
           completedAt,
           durationMs,
           offersAttempted: offersChecked,
@@ -514,7 +533,7 @@ export async function runMonitoringCycle(options = {}) {
           offersFailed: errorsCount,
           triggeredAlerts,
           errors: sanitizedErrors,
-          failureReason: fatalError,
+          failureReason,
         });
       } catch (dbErr) {
         console.error('[monitor] Failed to update finalized MonitorRun document:', dbErr.message);

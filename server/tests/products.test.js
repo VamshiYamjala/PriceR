@@ -2,7 +2,9 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../src/app.js';
-import connectDB from '../src/config/db.js';
+import connectDB, { disconnectDB } from '../src/config/db.js';
+import Offer from '../src/models/Offer.js';
+import { seedFixtures } from '../src/jobs/seedFixtures.js';
 
 const hasDb = Boolean(process.env.MONGODB_URI);
 
@@ -13,13 +15,15 @@ describe('Products & Search API (Connected Database)', () => {
     if (mongoose.connection.readyState === 0) {
       await connectDB();
     }
+    const count = await Offer.countDocuments();
+    if (count === 0) {
+      await seedFixtures({ mongoUri: process.env.MONGODB_URI });
+    }
   });
 
   afterAll(async () => {
     if (!hasDb) return;
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
+    await disconnectDB();
   });
 
   it('GET /api/products/search with empty query should return empty products array', async () => {
