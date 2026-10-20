@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
@@ -7,6 +8,7 @@ import User from '../src/models/User.js';
 import Offer from '../src/models/Offer.js';
 import WatchlistItem from '../src/models/WatchlistItem.js';
 import Alert from '../src/models/Alert.js';
+import emailService from '../src/services/notifications/email.js';
 import { seedFixtures } from '../src/jobs/seedFixtures.js';
 
 describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 & 6.4)', () => {
@@ -14,6 +16,18 @@ describe('Watchlist and Alerts API with User Isolation (Document 1 Sections 6.3 
   let userAId, userBId;
   let tokenA, tokenB;
   let testOfferId;
+  let sendEmailSpy;
+
+  beforeEach(() => {
+    sendEmailSpy = jest.spyOn(emailService, 'sendEmail').mockResolvedValue({
+      success: true,
+      providerMessageId: 'mock-test-brevo-id-123',
+    });
+  });
+
+  afterEach(() => {
+    if (sendEmailSpy) sendEmailSpy.mockRestore();
+  });
 
   const hasDb = Boolean(process.env.MONGODB_URI);
 

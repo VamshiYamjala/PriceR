@@ -48,7 +48,6 @@ jobs:
           MONGODB_URI: mongodb://127.0.0.1:27017/priceradar_ci_test
           JWT_SECRET: ci-test-secret-at-least-32-characters-long
           MONITOR_TRIGGER_SECRET: ci-monitor-secret-12345
-          MONITORING_ENABLED: "false"
         run: npm test
 
   frontend-build:
