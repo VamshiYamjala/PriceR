@@ -99,7 +99,7 @@ export default function ProductDetailPage() {
   const activeHistory = activeHistoryOffer ? historyByOffer[activeHistoryOffer] : null;
 
   return (
-    <div className="py-2">
+    <div className="container py-4">
       <nav aria-label="breadcrumb">
         <ol className="breadcrumb small">
           <li className="breadcrumb-item"><Link to="/">Home</Link></li>

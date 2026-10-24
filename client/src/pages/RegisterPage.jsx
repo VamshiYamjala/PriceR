@@ -113,8 +113,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="row justify-content-center py-4">
-      <div className="col-12 col-sm-10 col-md-7 col-lg-5" style={{ maxWidth: '440px' }}>
+    <div className="container py-4">
+      <div className="row justify-content-center">
+        <div className="col-12 col-sm-10 col-md-7 col-lg-5" style={{ maxWidth: '440px' }}>
         <div
           className="card border-0 rounded-4 bg-white"
           style={{
@@ -344,5 +345,6 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  </div>
   );
 }

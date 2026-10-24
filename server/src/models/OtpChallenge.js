@@ -12,16 +12,21 @@ const otpChallengeSchema = new mongoose.Schema(
     },
     otpHash: {
       type: String,
-      required: true,
+      required: false,
     },
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     passwordHash: {
       type: String,
-      required: true,
+      required: false,
+    },
+    resetTokenHash: {
+      type: String,
+      required: false,
+      default: null,
     },
     purpose: {
       type: String,

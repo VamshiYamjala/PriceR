@@ -61,7 +61,7 @@ export default function NotificationHistoryPage() {
   }
 
   return (
-    <div className="py-2">
+    <div className="container py-4">
       {/* Top Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 mb-4 border-bottom">
         <div>

@@ -126,8 +126,9 @@ export default function AlertFormPage() {
   }
 
   return (
-    <div className="row justify-content-center py-4">
-      <div className="col-12 col-md-8 col-lg-6">
+    <div className="container py-4">
+      <div className="row justify-content-center">
+        <div className="col-12 col-md-8 col-lg-6">
         <div className="mb-3">
           <Link to="/alerts" className="text-decoration-none small fw-semibold" style={{ color: 'var(--pr-forest)' }}>
             ← Back to Price Alerts
@@ -312,5 +313,6 @@ export default function AlertFormPage() {
         </div>
       </div>
     </div>
+  </div>
   );
 }

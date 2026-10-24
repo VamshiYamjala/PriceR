@@ -37,7 +37,7 @@ export default function WatchlistPage() {
   }
 
   return (
-    <div className="py-2">
+    <div className="container py-4">
       {/* Top Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 mb-4 border-bottom">
         <div>
@@ -132,7 +132,7 @@ export default function WatchlistPage() {
                     className="p-3 p-md-4 rounded-4 bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
                     style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
                   >
-                    <div className="d-flex align-items-center gap-3">
+                    <div className="d-flex align-items-center gap-3 min-w-0 flex-grow-1">
                       {offer.imageUrl ? (
                         <div
                           className="rounded-3 d-flex align-items-center justify-content-center p-2 flex-shrink-0"
@@ -153,8 +153,8 @@ export default function WatchlistPage() {
                           🛍️
                         </div>
                       )}
-                      <div>
-                        <div className="d-flex align-items-center gap-2 mb-1">
+                      <div className="min-w-0 flex-grow-1">
+                        <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                           {offer.provider && (
                             <span
                               className="badge text-uppercase tracking-wider fw-semibold px-2 py-0.5 rounded-pill"
@@ -169,7 +169,7 @@ export default function WatchlistPage() {
                             </span>
                           )}
                         </div>
-                        <h2 className="h6 fw-bold mb-1 text-truncate" style={{ maxWidth: '440px', color: 'var(--pr-text-dark)' }}>
+                        <h2 className="h6 fw-bold mb-1 text-truncate" style={{ color: 'var(--pr-text-dark)' }}>
                           {offer.title || 'Tracked Product Offer'}
                         </h2>
                         <div className="fs-5 fw-bold" style={{ color: 'var(--pr-forest)' }}>
@@ -178,7 +178,7 @@ export default function WatchlistPage() {
                       </div>
                     </div>
 
-                    <div className="d-flex align-items-center gap-2 align-self-end align-self-md-center">
+                    <div className="d-flex align-items-center gap-2 align-self-end align-self-md-center flex-shrink-0">
                       {offerId && (
                         <Link
                           to={`/alerts/new?offerId=${offerId}`}

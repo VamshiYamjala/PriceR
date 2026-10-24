@@ -62,6 +62,22 @@ export function getMe() {
   return unwrap(api.get('/api/auth/me'));
 }
 
+export function forgotPassword({ email }) {
+  return unwrap(api.post('/api/auth/forgot-password', { email }));
+}
+
+export function verifyResetOtp({ email, otp }) {
+  return unwrap(api.post('/api/auth/verify-reset-otp', { email, otp }));
+}
+
+export function resendResetOtp({ email }) {
+  return unwrap(api.post('/api/auth/resend-reset-otp', { email }));
+}
+
+export function resetPassword({ email, resetToken, newPassword }) {
+  return unwrap(api.post('/api/auth/reset-password', { email, resetToken, newPassword }));
+}
+
 // =========================================================================
 // Products and offers — Document 1 Section 6.2 & Multi-Provider Architecture
 // =========================================================================

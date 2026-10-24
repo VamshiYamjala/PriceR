@@ -77,7 +77,7 @@ export default function AlertManagementPage() {
   const triggeredCount = alerts.filter((a) => !a.armed).length;
 
   return (
-    <div className="py-2">
+    <div className="container py-4">
       {/* Top Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 mb-4 border-bottom">
         <div>
@@ -158,35 +158,26 @@ export default function AlertManagementPage() {
             <>
               {/* Summary Metric Strip */}
               <div className="row g-3 mb-4">
-                <div className="col-sm-4">
-                  <div
-                    className="p-3 rounded-4 bg-white text-center"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-4">
+                  <div className="pr-metric-card text-center py-3">
                     <span className="text-muted d-block small fw-medium mb-1">Total Rules</span>
-                    <span className="fs-4 fw-bold" style={{ color: 'var(--pr-text-dark)' }}>
+                    <span className="fs-3 fw-bold" style={{ color: 'var(--pr-text-dark)' }}>
                       {totalCount}
                     </span>
                   </div>
                 </div>
-                <div className="col-sm-4">
-                  <div
-                    className="p-3 rounded-4 bg-white text-center"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-4">
+                  <div className="pr-metric-card text-center py-3">
                     <span className="text-muted d-block small fw-medium mb-1">Armed &amp; Monitoring</span>
-                    <span className="fs-4 fw-bold" style={{ color: 'var(--pr-forest)' }}>
+                    <span className="fs-3 fw-bold" style={{ color: 'var(--pr-forest)' }}>
                       {armedCount}
                     </span>
                   </div>
                 </div>
-                <div className="col-sm-4">
-                  <div
-                    className="p-3 rounded-4 bg-white text-center"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-4">
+                  <div className="pr-metric-card text-center py-3">
                     <span className="text-muted d-block small fw-medium mb-1">Triggered</span>
-                    <span className="fs-4 fw-bold" style={{ color: '#D97706' }}>
+                    <span className="fs-3 fw-bold" style={{ color: '#D97706' }}>
                       {triggeredCount}
                     </span>
                   </div>
@@ -257,8 +248,8 @@ export default function AlertManagementPage() {
                         className="p-3 p-md-4 rounded-4 bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
                         style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
                       >
-                        <div className="flex-grow-1">
-                          <div className="d-flex align-items-center gap-2 mb-1">
+                        <div className="min-w-0 flex-grow-1">
+                          <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                             <span
                               className={`badge rounded-pill px-2.5 py-0.5 fw-semibold ${
                                 alert.status === 'active' ? 'pr-badge-live' : 'bg-secondary-subtle text-secondary'
@@ -285,7 +276,7 @@ export default function AlertManagementPage() {
                             </span>
                           </div>
 
-                          <h2 className="h6 fw-bold mb-1" style={{ color: 'var(--pr-text-dark)' }}>
+                          <h2 className="h6 fw-bold mb-1 text-truncate" style={{ color: 'var(--pr-text-dark)' }}>
                             {alert.offer?.title || `Alert Rule #${alert.id.substring(0, 8)}`}
                           </h2>
 
@@ -308,7 +299,7 @@ export default function AlertManagementPage() {
                           )}
                         </div>
 
-                        <div className="d-flex align-items-center gap-2 align-self-end align-self-md-center">
+                        <div className="d-flex align-items-center gap-2 align-self-end align-self-md-center flex-shrink-0">
                           <button
                             type="button"
                             className="btn btn-pr-outline-forest btn-sm px-3 py-1.5"

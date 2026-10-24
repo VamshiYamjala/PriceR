@@ -8,6 +8,10 @@ import {
   resendRegistrationOtp,
   login,
   getMe,
+  forgotPassword,
+  verifyResetOtp,
+  resendResetOtp,
+  resetPassword,
 } from '../controllers/authController.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -64,6 +68,46 @@ router.post(
   ],
   validate,
   login
+);
+
+// Password Reset OTP flow
+router.post(
+  '/forgot-password',
+  [
+    body('email').isEmail().withMessage('Please provide a valid email address.'),
+  ],
+  validate,
+  forgotPassword
+);
+
+router.post(
+  '/verify-reset-otp',
+  [
+    body('email').isEmail().withMessage('Please provide a valid email address.'),
+    body('otp').trim().isLength({ min: 6, max: 6 }).withMessage('OTP must be a 6-digit code.'),
+  ],
+  validate,
+  verifyResetOtp
+);
+
+router.post(
+  '/resend-reset-otp',
+  [
+    body('email').isEmail().withMessage('Please provide a valid email address.'),
+  ],
+  validate,
+  resendResetOtp
+);
+
+router.post(
+  '/reset-password',
+  [
+    body('email').isEmail().withMessage('Please provide a valid email address.'),
+    body('resetToken').trim().notEmpty().withMessage('Reset authorization token is required.'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.'),
+  ],
+  validate,
+  resetPassword
 );
 
 router.get('/me', requireAuth, getMe);

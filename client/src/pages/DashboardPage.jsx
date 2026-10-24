@@ -64,7 +64,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="py-2">
+    <div className="container py-4">
       {/* Top Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 mb-4 border-bottom">
         <div>
@@ -161,68 +161,56 @@ export default function DashboardPage() {
 
               {/* 4 Metric Cards */}
               <div className="row g-3 mb-4">
-                <div className="col-sm-6 col-lg-3">
-                  <div
-                    className="p-3.5 rounded-4 bg-white h-100"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-6 col-lg-3">
+                  <div className="pr-metric-card">
                     <span className="text-muted small fw-semibold text-uppercase tracking-wider d-block mb-1">
                       Watchlist
                     </span>
-                    <div className="fs-3 fw-bold mb-1" style={{ color: 'var(--pr-text-dark)' }}>
+                    <div className="fs-3 fw-bold my-1" style={{ color: 'var(--pr-text-dark)' }}>
                       {loading ? '—' : watchlist.length}
                     </div>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Tracked listings</span>
+                    <span className="text-muted small">Tracked listings</span>
                   </div>
                 </div>
 
-                <div className="col-sm-6 col-lg-3">
-                  <div
-                    className="p-3.5 rounded-4 bg-white h-100"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-6 col-lg-3">
+                  <div className="pr-metric-card">
                     <span className="text-muted small fw-semibold text-uppercase tracking-wider d-block mb-1">
                       Active Alerts
                     </span>
-                    <div className="fs-3 fw-bold mb-1" style={{ color: 'var(--pr-forest)' }}>
+                    <div className="fs-3 fw-bold my-1" style={{ color: 'var(--pr-forest)' }}>
                       {loading ? '—' : alerts.length}
                     </div>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Target &amp; drop rules</span>
+                    <span className="text-muted small">Target &amp; drop rules</span>
                   </div>
                 </div>
 
-                <div className="col-sm-6 col-lg-3">
-                  <div
-                    className="p-3.5 rounded-4 bg-white h-100"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-6 col-lg-3">
+                  <div className="pr-metric-card">
                     <span className="text-muted small fw-semibold text-uppercase tracking-wider d-block mb-1">
                       Refresh Cadence
                     </span>
-                    <div className="fs-3 fw-bold mb-1" style={{ color: 'var(--pr-text-dark)' }}>
+                    <div className="fs-3 fw-bold my-1" style={{ color: 'var(--pr-text-dark)' }}>
                       4.0h
                     </div>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Automated cycle</span>
+                    <span className="text-muted small">Automated cycle</span>
                   </div>
                 </div>
 
-                <div className="col-sm-6 col-lg-3">
-                  <div
-                    className="p-3.5 rounded-4 bg-white h-100"
-                    style={{ border: '1px solid var(--pr-border)', boxShadow: 'var(--pr-card-shadow)' }}
-                  >
+                <div className="col-6 col-lg-3">
+                  <div className="pr-metric-card">
                     <span className="text-muted small fw-semibold text-uppercase tracking-wider d-block mb-1">
                       Alert Channels
                     </span>
-                    <div className="d-flex gap-1.5 align-items-center mb-1 mt-1">
-                      <span className="badge rounded-pill pr-badge-live px-2 py-0.5" style={{ fontSize: '0.7rem' }}>
+                    <div className="d-flex flex-wrap gap-1 align-items-center my-1" style={{ minHeight: '38px' }}>
+                      <span className="badge rounded-pill pr-badge-live px-2 py-0.5" style={{ fontSize: '0.72rem' }}>
                         Email
                       </span>
-                      <span className="badge rounded-pill pr-badge-live px-2 py-0.5" style={{ fontSize: '0.7rem' }}>
+                      <span className="badge rounded-pill pr-badge-live px-2 py-0.5" style={{ fontSize: '0.72rem' }}>
                         Telegram
                       </span>
                     </div>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Instant delivery</span>
+                    <span className="text-muted small">Instant delivery</span>
                   </div>
                 </div>
               </div>
@@ -267,7 +255,7 @@ export default function DashboardPage() {
                             className="d-flex justify-content-between align-items-center p-2.5 rounded-3"
                             style={{ background: 'var(--pr-bg-soft)', border: '1px solid var(--pr-border)' }}
                           >
-                            <div className="text-truncate me-2" style={{ maxWidth: '65%' }}>
+                            <div className="min-w-0 flex-grow-1 me-2">
                               <div className="fw-semibold small text-truncate" style={{ color: 'var(--pr-text-dark)' }}>
                                 {item.offer?.title || 'Tracked Offer'}
                               </div>
@@ -278,7 +266,7 @@ export default function DashboardPage() {
                                 {item.offer?.provider}
                               </span>
                             </div>
-                            <div className="text-end">
+                            <div className="text-end flex-shrink-0">
                               <div className="fw-bold small" style={{ color: 'var(--pr-forest)' }}>
                                 ₹{((item.offer?.priceInPaise || 0) / 100).toLocaleString('en-IN')}
                               </div>
@@ -337,7 +325,7 @@ export default function DashboardPage() {
                             className="d-flex justify-content-between align-items-center p-2.5 rounded-3"
                             style={{ background: 'var(--pr-bg-soft)', border: '1px solid var(--pr-border)' }}
                           >
-                            <div className="text-truncate me-2" style={{ maxWidth: '65%' }}>
+                            <div className="min-w-0 flex-grow-1 me-2">
                               <div className="fw-semibold small text-truncate" style={{ color: 'var(--pr-text-dark)' }}>
                                 {alert.offer?.title || `Alert Rule (${alert.id.substring(0, 8)})`}
                               </div>
@@ -349,7 +337,7 @@ export default function DashboardPage() {
                                 </span>
                               </div>
                             </div>
-                            <div className="text-end">
+                            <div className="text-end flex-shrink-0">
                               <span
                                 className="badge rounded-pill px-2 py-0.5 fw-semibold"
                                 style={{

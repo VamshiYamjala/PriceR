@@ -8,6 +8,7 @@ import SearchPage from './pages/SearchPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import WatchlistPage from './pages/WatchlistPage';
 import AlertFormPage from './pages/AlertFormPage';
@@ -29,8 +30,8 @@ export default function App() {
           <Route path="/products/:productId" element={<ProductDetailPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/diagnostics" element={<DiagnosticsPage />} />
-          <Route path="/dev/diagnostics" element={<DiagnosticsPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          {import.meta.env.DEV && <Route path="/dev/diagnostics" element={<DiagnosticsPage />} />}
           <Route
             path="/dashboard"
             element={
