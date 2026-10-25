@@ -24,33 +24,51 @@ jobs:
           MONITOR_SECRET: ${{ secrets.MONITOR_TRIGGER_SECRET }}
         run: |
           set -e
+          set +x # Ensure secrets are never echoed in shell traces
 
+          # 1. Validate required GitHub Actions repository secrets
           if [ -z "$BACKEND_URL" ]; then
             echo "::error::Required secret BACKEND_URL is not configured in GitHub repository secrets."
+            echo "Please configure BACKEND_URL in GitHub: Settings -> Secrets and variables -> Actions."
+            echo "Expected value for Render backend: https://priceradar-api-02ib.onrender.com"
             exit 1
           fi
 
           if [ -z "$MONITOR_SECRET" ]; then
             echo "::error::Required secret MONITOR_TRIGGER_SECRET is not configured in GitHub repository secrets."
+            echo "Please configure MONITOR_TRIGGER_SECRET in GitHub: Settings -> Secrets and variables -> Actions."
+            echo "This secret must match the MONITOR_TRIGGER_SECRET environment variable in the Render backend."
             exit 1
           fi
 
-          # Strip any trailing slash from BACKEND_URL
+          # 2. Strip any trailing slash and validate URL scheme and format
           BASE_URL="${BACKEND_URL%/}"
+          if ! echo "$BASE_URL" | grep -Eq '^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$'; then
+            echo "::error::BACKEND_URL is invalid ('$BASE_URL'). It must be a valid URL starting with https:// or http://."
+            exit 1
+          fi
+
+          HEALTH_URL="${BASE_URL}/api/health"
           TRIGGER_URL="${BASE_URL}/api/monitor/run"
 
-          echo "Pinging backend health endpoint to wake sleeping instances: ${BASE_URL}/api/health"
-          curl -s -S -o /dev/null \
-            --retry 5 \
+          # 3. Wake sleeping Render instances via public health endpoint
+          echo "Pinging backend health endpoint to wake sleeping instances: ${HEALTH_URL}"
+          HEALTH_STATUS=$(curl -s -S -o /dev/null -w "%{http_code}" \
+            --retry 6 \
             --retry-delay 5 \
             --retry-connrefused \
             --max-time 45 \
-            "${BASE_URL}/api/health" || echo "Wakeup ping completed or timed out; proceeding to trigger."
+            "$HEALTH_URL" || echo "000")
 
+          echo "Health Check HTTP Status: $HEALTH_STATUS"
+          if [ "$HEALTH_STATUS" -eq 200 ]; then
+            echo "✅ Backend service is awake and responding to health checks."
+          else
+            echo "::warning::Health check returned HTTP $HEALTH_STATUS. Cold start may still be in progress; proceeding to trigger endpoint..."
+          fi
+
+          # 4. Trigger price monitor endpoint with bounded retries
           echo "Triggering price monitor endpoint: ${TRIGGER_URL}"
-          echo "Using bounded retries to accommodate Render free-tier cold starts..."
-
-          # Curl with bounded retries for sleeping Render free instances
           HTTP_CODE=$(curl -s -S -o trigger_response.json -w "%{http_code}" \
             --retry 3 \
             --retry-delay 5 \
@@ -62,7 +80,19 @@ jobs:
 
           echo "Trigger HTTP Status Code: $HTTP_CODE"
 
-          if [ "$HTTP_CODE" -ne 202 ]; then
+          if [ "$HTTP_CODE" -eq 401 ] || [ "$HTTP_CODE" -eq 403 ]; then
+            echo "::error::Authentication failed (HTTP $HTTP_CODE). The MONITOR_TRIGGER_SECRET in GitHub Actions does not match the MONITOR_TRIGGER_SECRET configured in the Render backend environment."
+            exit 1
+          elif [ "$HTTP_CODE" -eq 404 ]; then
+            echo "::error::Endpoint not found (HTTP 404) at $TRIGGER_URL. Verify BACKEND_URL points to the PriceRadar Express backend API."
+            exit 1
+          elif [ "$HTTP_CODE" -eq 409 ]; then
+            echo "::warning::Price monitoring cycle skipped (HTTP 409: OVERLAPPING_CYCLE). Another price monitoring cycle is already in progress with active distributed lock."
+            exit 0
+          elif [ "$HTTP_CODE" -eq 429 ]; then
+            echo "::error::Rate limit exceeded (HTTP 429). The backend rate limiter throttled the request."
+            exit 1
+          elif [ "$HTTP_CODE" -ne 202 ]; then
             echo "::error::Price monitor trigger did not return HTTP 202 Accepted. Status: $HTTP_CODE"
             if [ -f trigger_response.json ]; then
               echo "Server Error Response:"
@@ -72,6 +102,7 @@ jobs:
             exit 1
           fi
 
+          # 5. Extract and validate Run ID
           RUN_ID=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('trigger_response.json', 'utf8')); console.log(d.data?.runId || ''); } catch { console.log(''); }")
 
           if [ -z "$RUN_ID" ]; then
@@ -85,11 +116,11 @@ jobs:
           echo "Monitoring Run ID: ${RUN_ID}"
           echo "Polling run-specific status at: ${BASE_URL}/api/monitor/runs/${RUN_ID}"
 
-          # Bounded poll loop: check status every 10s for up to 180s
+          # 6. Bounded poll loop: check status every 10s for up to 180s
           MAX_POLL_SECS=180
           POLL_INTERVAL=10
           ELAPSED=0
-          FINAL_STATUS="in_progress"
+          FINAL_STATUS="running"
 
           while [ $ELAPSED -lt $MAX_POLL_SECS ]; do
             sleep $POLL_INTERVAL
@@ -111,10 +142,11 @@ jobs:
               FINAL_STATUS="$CURRENT_STATUS"
               break
             else
-              echo "Monitoring cycle is in progress... (elapsed: ${ELAPSED}s)"
+              echo "Monitoring cycle is in progress... (status: ${CURRENT_STATUS}, elapsed: ${ELAPSED}s)"
             fi
           done
 
+          # 7. Final outcome reporting & status evaluation
           echo ""
           echo "=========================================================="
           echo "Final Monitoring Outcome for Run: ${RUN_ID}"
@@ -142,7 +174,7 @@ jobs:
             ERRORS_COUNT=$(node -e "try { const d = JSON.parse(require('fs').readFileSync('status_response.json', 'utf8')).data; console.log(d.offersFailed || 0); } catch { console.log(0); }")
 
             if [ "$ATTEMPTED_COUNT" -gt 0 ] && [ "$SUCCESS_COUNT" -eq 0 ]; then
-              echo "::error::All $ATTEMPTED_COUNT tracked offer refresh(es) failed during this monitoring cycle. Check provider credentials."
+              echo "::error::All $ATTEMPTED_COUNT tracked offer refresh(es) failed during this monitoring cycle. Check provider credentials in Render."
               exit 1
             elif [ "$ERRORS_COUNT" -gt 0 ]; then
               echo "::warning::$ERRORS_COUNT of $ATTEMPTED_COUNT offer refresh(es) encountered errors during this cycle."
