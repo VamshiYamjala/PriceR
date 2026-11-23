@@ -15,6 +15,7 @@ server/.env
 # Production build outputs
 dist/
 build/
+!mern-learning-platform/dist/
 
 # Logs
 logs/
